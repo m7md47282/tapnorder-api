@@ -1,0 +1,97 @@
+type User @table {
+  displayName: String!
+  createdAt: Timestamp!
+  email: String!
+  photoUrl: String
+  role: UserRole!
+  isActive: Boolean!
+}
+
+enum UserRole {
+  CUSTOMER
+  CASHIER
+  KITCHEN
+  ADMIN
+}
+
+type MenuItem @table {
+  name: String!
+  description: String
+  price: Float!
+  category: String!
+  imageUrl: String
+  isAvailable: Boolean!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+  preparationTime: Int # in minutes
+  allergens: [String]
+  nutritionalInfo: NutritionalInfo
+}
+
+type NutritionalInfo {
+  calories: Int
+  protein: Float
+  carbs: Float
+  fat: Float
+  fiber: Float
+}
+
+type Order @table {
+  user: User!
+  items: [OrderItem!]!
+  totalAmount: Float!
+  status: OrderStatus!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+  estimatedPickupTime: Timestamp
+  specialInstructions: String
+  paymentMethod: PaymentMethod!
+  paymentStatus: PaymentStatus!
+}
+
+type OrderItem {
+  menuItem: MenuItem!
+  quantity: Int!
+  unitPrice: Float!
+  specialInstructions: String
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_PAYMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+type Restaurant @table {
+  name: String!
+  address: String!
+  phone: String!
+  email: String!
+  openingHours: [OpeningHours!]!
+  isOpen: Boolean!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type OpeningHours {
+  dayOfWeek: Int! # 0 = Sunday, 1 = Monday, etc.
+  openTime: String! # HH:MM format
+  closeTime: String! # HH:MM format
+  isClosed: Boolean!
+}

@@ -1,0 +1,17 @@
+{
+  "functions": {
+    "source": ".",
+    "runtime": "nodejs22"
+  },
+  "emulators": {
+    "functions": {
+      "port": 5002
+    },
+    "dataconnect": {
+      "dataDir": "dataconnect/.dataconnect/pgliteData"
+    }
+  },
+  "dataconnect": {
+    "source": "dataconnect"
+  }
+}

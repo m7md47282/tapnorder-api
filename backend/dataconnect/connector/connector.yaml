@@ -1,0 +1,9 @@
+connectorId: "default"
+
+
+# Generate JavaScript SDK for the web app
+generate:
+  javascriptSdk:
+    outputDir: "../web/dataconnect-generated/js/default-connector"
+    package: "@tabnorder/default-connector"
+    packageJsonDir: "../web"
