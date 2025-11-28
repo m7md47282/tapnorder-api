@@ -1,193 +1,188 @@
 import { Request, Response } from 'express';
 import { MenuService } from '../services/menu.service';
-import { Menu, MenuItem } from '../repositories/menu/menu.repository';
+import { Menu } from '../repositories/menu/types';
+import { logger } from 'firebase-functions/v2';
+import { ErrorHandler, ApiResponse } from '../shared/errors/error-handler';
+import { 
+  ValidationError, 
+  InvalidInputError, 
+  MissingRequiredFieldError,
+  MenuNotFoundError
+} from '../shared/errors/custom-errors';
 
-type ApiResponse<T = void> = {
-  success: boolean;
-  message?: string;
-  data?: T;
-  error?: string;
-};
-
+/**
+ * Menu Controller - Presentation Layer
+ * Follows SOLID principles and Clean Architecture
+ * NO business logic - delegates to services
+ * Handles HTTP requests and responses only
+ */
 export class MenuController {
-  constructor(private readonly menuService: MenuService) {}
+  private menuService: MenuService;
+
+  constructor() {
+    this.menuService = new MenuService();
+  }
 
   private sendResponse<T>(res: Response, statusCode: number, response: ApiResponse<T>): void {
     res.status(statusCode).json(response);
   }
 
   private handleError(res: Response, error: unknown): void {
-    const err = error as Error;
-    if (err.message === 'Menu not found for the given place ID' || err.message === 'Menu item not found') {
-      this.sendResponse(res, 404, {
-        success: false,
-        error: err.message
-      });
-      return;
-    }
-
-    this.sendResponse(res, 500, {
-      success: false,
-      error: 'Internal server error',
-      message: err.message
-    });
+    ErrorHandler.handleError(error, {} as Request, res);
   }
 
   private validatePlaceId(placeId: string | undefined): placeId is string {
     return typeof placeId === 'string' && placeId.trim().length > 0;
   }
 
-  private validateMenuItemData(data: Partial<MenuItem>): boolean {
-    if (!data) return false;
-    
-    if ('price' in data && (typeof data.price !== 'number' || data.price < 0)) {
-      return false;
+  private validateMenuData(data: Partial<Menu>): void {
+    if (!data) {
+      throw new InvalidInputError('Menu data is required');
     }
     
-    if ('available' in data && typeof data.available !== 'boolean') {
-      return false;
-    }
-    
-    if ('name' in data && (typeof data.name !== 'string' || data.name.trim().length === 0)) {
-      return false;
+    if ('name' in data && data.name !== undefined) {
+      if (typeof data.name !== 'string' || data.name.trim().length === 0) {
+        throw new ValidationError('Menu name must be a non-empty string', {
+          field: 'name',
+          value: data.name
+        });
+      }
     }
 
-    return true;
+    if ('description' in data && data.description !== undefined) {
+      if (typeof data.description !== 'string') {
+        throw new ValidationError('Menu description must be a string', {
+          field: 'description',
+          value: data.description
+        });
+      }
+    }
+
+    if ('categories' in data && data.categories !== undefined) {
+      if (!Array.isArray(data.categories)) {
+        throw new ValidationError('Menu categories must be an array', {
+          field: 'categories',
+          value: data.categories
+        });
+      }
+    }
+
+    if ('isActive' in data && data.isActive !== undefined) {
+      if (typeof data.isActive !== 'boolean') {
+        throw new ValidationError('Menu isActive must be a boolean', {
+          field: 'isActive',
+          value: data.isActive
+        });
+      }
+    }
   }
 
   getMenuByPlaceId = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { placeId } = req.params;
+      if(req.method !== 'GET') {
+        throw new ValidationError('Method not allowed', {
+          field: 'method',
+          value: req.method,
+          suggestion: 'Use GET method for retrieving menu data'
+        });
+      }
+      
+      const placeId = req.query.placeId as string;
       
       if (!this.validatePlaceId(placeId)) {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid place ID'
+        throw new MissingRequiredFieldError('placeId', {
+          field: 'placeId',
+          value: placeId,
+          suggestion: 'Provide a valid place ID as a query parameter'
         });
-        return;
       }
 
       const menu = await this.menuService.getMenuByPlaceId(placeId);
 
       if (!menu) {
-        this.sendResponse(res, 404, {
-          success: false,
-          error: 'Menu not found'
-        });
-        return;
+        throw new MenuNotFoundError(placeId);
       }
 
-      this.sendResponse(res, 200, {
-        success: true,
-        data: menu
-      });
+      const { statusCode, response } = ErrorHandler.createSuccessResponse(menu, 'Menu retrieved successfully', 200, req);
+      this.sendResponse(res, statusCode, response);
     } catch (error) {
       this.handleError(res, error);
     }
   };
 
-  updateMenu = async (req: Request, res: Response): Promise<void> => {
+  createMenuForPlace = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { placeId } = req.params;
-      const menuData = req.body as Partial<Omit<Menu, 'id' | 'createdAt' | 'updatedAt' | 'placeId'>>;
+      if(req.method !== 'POST') {
+        throw new ValidationError('Method not allowed', {
+          field: 'method',
+          value: req.method,
+          suggestion: 'Use POST method for creating menu data'
+        });
+      }
 
+      logger.info('req.query', req.query.placeId);
+
+      const placeId = req.query.placeId as string;
       if (!this.validatePlaceId(placeId)) {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid place ID'
+        throw new MissingRequiredFieldError('placeId', {
+          field: 'placeId',
+          value: placeId,
+          suggestion: 'Provide a valid place ID as a query parameter'
         });
-        return;
       }
 
-      if (!menuData || typeof menuData !== 'object') {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid menu data'
-        });
-        return;
-      }
+      this.validateMenuData(req.body);
 
-      await this.menuService.updateMenu(placeId, menuData);
-      
-      this.sendResponse(res, 200, {
-        success: true,
-        message: 'Menu updated successfully'
-      });
+      const menuId = await this.menuService.createMenu(placeId, req.body);
+  
+      const { statusCode, response } = ErrorHandler.createSuccessResponse(
+        { menuId }, 
+        'Menu created successfully', 
+        201, 
+        req
+      );
+      this.sendResponse(res, statusCode, response);
     } catch (error) {
       this.handleError(res, error);
     }
   };
 
-  createMenu = async (req: Request, res: Response): Promise<void> => {
+
+  updateMenuForPlace = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { placeId } = req.params;
-      const menuData = req.body as Omit<Menu, 'id' | 'createdAt' | 'updatedAt'>;
+      if(req.method !== 'PUT') {
+        throw new ValidationError('Method not allowed', {
+          field: 'method',
+          value: req.method,
+          suggestion: 'Use PUT method for updating menu data'
+        });
+      }
 
+      const placeId = req.query.placeId as string;
       if (!this.validatePlaceId(placeId)) {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid place ID'
+        throw new MissingRequiredFieldError('placeId', {
+          field: 'placeId',
+          value: placeId,
+          suggestion: 'Provide a valid place ID as a query parameter'
         });
-        return;
       }
 
-      if (!menuData || !Array.isArray(menuData.items)) {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid menu data. Menu items array is required'
-        });
-        return;
-      }
+      this.validateMenuData(req.body);
 
-      const menuId = await this.menuService.createMenu(placeId, menuData);
-      
-      this.sendResponse(res, 201, {
-        success: true,
-        message: 'Menu created successfully',
-        data: { id: menuId }
-      });
+      await this.menuService.updateMenu(placeId, req.body);
+
+      const { statusCode, response } = ErrorHandler.createSuccessResponse(
+        null, 
+        'Menu updated successfully', 
+        200, 
+        req
+      );
+      this.sendResponse(res, statusCode, response);
     } catch (error) {
       this.handleError(res, error);
     }
   };
 
-  updateMenuItem = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { placeId, itemId } = req.params;
-      const itemData = req.body as Partial<MenuItem>;
 
-      if (!this.validatePlaceId(placeId)) {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid place ID'
-        });
-        return;
-      }
-
-      if (!itemId || typeof itemId !== 'string' || itemId.trim().length === 0) {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid item ID'
-        });
-        return;
-      }
-
-      if (!this.validateMenuItemData(itemData)) {
-        this.sendResponse(res, 400, {
-          success: false,
-          error: 'Invalid menu item data'
-        });
-        return;
-      }
-
-      await this.menuService.updateMenuItem(placeId, itemId, itemData);
-      
-      this.sendResponse(res, 200, {
-        success: true,
-        message: 'Menu item updated successfully'
-      });
-    } catch (error) {
-      this.handleError(res, error);
-    }
-  };
 }
+

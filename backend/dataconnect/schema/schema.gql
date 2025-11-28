@@ -1,34 +1,13 @@
-type User @table {
-  displayName: String!
-  createdAt: Timestamp!
-  email: String!
-  photoUrl: String
-  role: UserRole!
-  isActive: Boolean!
-}
+# TabNOrder GraphQL Schema
+# Restaurant Menu Management System
 
-enum UserRole {
-  CUSTOMER
-  CASHIER
-  KITCHEN
-  ADMIN
-}
+# Base scalar types
+scalar DateTime
+scalar JSON
 
-type MenuItem @table {
-  name: String!
-  description: String
-  price: Float!
-  category: String!
-  imageUrl: String
-  isAvailable: Boolean!
-  createdAt: Timestamp!
-  updatedAt: Timestamp!
-  preparationTime: Int # in minutes
-  allergens: [String]
-  nutritionalInfo: NutritionalInfo
-}
-
-type NutritionalInfo {
+# Nutritional specifications for menu items
+type NutritionalSpecs {
+  allergens: [String!]
   calories: Int
   protein: Float
   carbs: Float
@@ -36,62 +15,92 @@ type NutritionalInfo {
   fiber: Float
 }
 
-type Order @table {
-  user: User!
-  items: [OrderItem!]!
-  totalAmount: Float!
-  status: OrderStatus!
-  createdAt: Timestamp!
-  updatedAt: Timestamp!
-  estimatedPickupTime: Timestamp
-  specialInstructions: String
-  paymentMethod: PaymentMethod!
-  paymentStatus: PaymentStatus!
-}
-
-type OrderItem {
-  menuItem: MenuItem!
-  quantity: Int!
-  unitPrice: Float!
-  specialInstructions: String
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PREPARING
-  READY
-  COMPLETED
-  CANCELLED
-}
-
-enum PaymentMethod {
-  CASH
-  CARD
-  MOBILE_PAYMENT
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
-}
-
-type Restaurant @table {
+# Menu item entity
+type Item {
+  id: ID!
   name: String!
-  address: String!
-  phone: String!
-  email: String!
-  openingHours: [OpeningHours!]!
-  isOpen: Boolean!
-  createdAt: Timestamp!
-  updatedAt: Timestamp!
+  description: String
+  price: Float!
+  category: String!
+  imageUrl: String
+  isAvailable: Boolean!
+  preparationTime: Int # in minutes
+  ingredients: [String!]
+  specs: NutritionalSpecs
+  menuId: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
-type OpeningHours {
-  dayOfWeek: Int! # 0 = Sunday, 1 = Monday, etc.
-  openTime: String! # HH:MM format
-  closeTime: String! # HH:MM format
-  isClosed: Boolean!
+# Menu entity
+type Menu {
+  id: ID!
+  placeId: ID!
+  name: String
+  description: String
+  categories: [String!]
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  items: [Item!] # Relationship to items
 }
+
+# Input types for creating items
+input NutritionalSpecsInput {
+  allergens: [String!]
+  calories: Int
+  protein: Float
+  carbs: Float
+  fat: Float
+  fiber: Float
+}
+
+input CreateItemInput {
+  name: String!
+  description: String
+  price: Float!
+  category: String!
+  imageUrl: String
+  isAvailable: Boolean = true
+  preparationTime: Int
+  ingredients: [String!]
+  specs: NutritionalSpecsInput!
+  menuId: ID!
+}
+
+input UpdateItemInput {
+  name: String
+  description: String
+  price: Float
+  category: String
+  imageUrl: String
+  isAvailable: Boolean
+  preparationTime: Int
+  ingredients: [String!]
+  specs: NutritionalSpecsInput
+}
+
+# Input types for creating menus
+input CreateMenuInput {
+  placeId: ID!
+  name: String
+  description: String
+  categories: [String!]
+  isActive: Boolean = true
+}
+
+input UpdateMenuInput {
+  name: String
+  description: String
+  categories: [String!]
+  isActive: Boolean
+}
+
+# Note: Firebase Data Connect provides built-in filtering and pagination
+# Custom filter types are typically defined in the connector configuration
+
+# Note: Firebase Data Connect handles response formatting automatically
+# Custom response types are typically not needed in Firebase Data Connect schemas
+
+# Note: Firebase Data Connect auto-generates Query, Mutation, and Subscription types
+# based on the data types and connector definitions

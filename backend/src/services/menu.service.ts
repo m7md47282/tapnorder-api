@@ -1,15 +1,34 @@
-import { MenuRepository, Menu, MenuItem } from '../repositories/menu/menu.repository';
-import { DatabaseClientFactory } from '../database/database-client';
+import { IMenuRepository } from '../repositories/interfaces/menu.repository.interface';
+import { Menu } from '../repositories/menu/types';
+import { MenuRepository } from '../repositories/menu/menu.repository';
+import { Item } from '../entities/item.entity';
+import { IMenuService } from './interfaces/menu.service.interface';
 
-export class MenuService {
-  private readonly menuRepository: MenuRepository;
+/**
+ * Menu Service - Simplified version using Firebase directly
+ * Contains ALL business logic and validation
+ * Uses Firebase repository directly
+ */
+export class MenuService implements IMenuService {
+  private menuRepository: IMenuRepository;
 
-  constructor(menuRepository?: MenuRepository) {
-    this.menuRepository = menuRepository || new MenuRepository(DatabaseClientFactory.getClient());
+  constructor(menuRepository?: IMenuRepository) {
+    this.menuRepository = menuRepository ?? new MenuRepository();
   }
 
   async getMenuByPlaceId(placeId: string): Promise<Menu | null> {
     return this.menuRepository.getByPlaceId(placeId);
+  }
+
+  async getMenuById(id: string): Promise<Menu | null> {
+    return this.menuRepository.getById(id);
+  }
+
+  async getMenuWithItems(placeId: string): Promise<{ menu: Menu; items: Item[] } | null> {
+    const menu = await this.menuRepository.getByPlaceId(placeId);
+    if (!menu) return null;
+    // Item fetching should be via ItemService; placeholder returns empty for now
+    return { menu, items: [] };
   }
 
   async updateMenu(placeId: string, menuData: Partial<Omit<Menu, 'id' | 'createdAt' | 'updatedAt' | 'placeId'>>): Promise<void> {
@@ -18,16 +37,12 @@ export class MenuService {
       throw new Error('Menu not found for the given place ID');
     }
 
-    const updatedMenu: Menu = {
-      ...menu,
-      ...menuData,
-      updatedAt: new Date()
-    };
-
-    await this.menuRepository.update(menu.id, updatedMenu);
+    await this.menuRepository.update(menu.id, menuData);
   }
 
-  async createMenu(placeId: string, menuData: Omit<Menu, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  async createMenu(placeId: string, menuData: Omit<Menu, 'id' | 'createdAt' | 'updatedAt' | 'placeId'>): Promise<string> {
+    console.log('MenuService: Starting createMenu for placeId:', placeId);
+    
     const newMenu: Omit<Menu, 'id'> = {
       ...menuData,
       placeId,
@@ -36,37 +51,12 @@ export class MenuService {
       updatedAt: new Date()
     };
 
-    return this.menuRepository.create(newMenu);
+    const menuId = await this.menuRepository.create(newMenu as any);
+    console.log('MenuService: Repository.createMenu completed, menuId:', menuId);
+    
+    return menuId;
   }
 
-  async updateMenuItem(placeId: string, itemId: string, itemData: Partial<MenuItem>): Promise<void> {
-    const menu = await this.menuRepository.getByPlaceId(placeId);
-    if (!menu) {
-      throw new Error('Menu not found for the given place ID');
-    }
+  // Item operations should be handled by a dedicated ItemService, not MenuService
 
-    const itemIndex = menu.items.findIndex(item => item.id === itemId);
-    if (itemIndex === -1) {
-      throw new Error('Menu item not found');
-    }
-
-    const currentItem = menu.items[itemIndex];
-    if (!currentItem) {
-      throw new Error('Menu item not found');
-    }
-
-    // Create updated item with only defined values from itemData
-    const updatedItem: MenuItem = {
-      ...currentItem,
-      ...(itemData.name !== undefined && { name: itemData.name }),
-      ...(itemData.description !== undefined && { description: itemData.description }),
-      ...(itemData.price !== undefined && { price: itemData.price }),
-      ...(itemData.available !== undefined && { available: itemData.available })
-    };
-
-    menu.items[itemIndex] = updatedItem;
-    menu.updatedAt = new Date();
-
-    await this.menuRepository.update(menu.id, menu);
-  }
 }

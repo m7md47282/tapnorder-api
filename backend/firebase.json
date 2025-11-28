@@ -3,9 +3,16 @@
     "source": ".",
     "runtime": "nodejs22"
   },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "y"
+  },
   "emulators": {
     "functions": {
       "port": 5002
+    },
+    "firestore": {
+      "port": 8080
     },
     "dataconnect": {
       "dataDir": "dataconnect/.dataconnect/pgliteData"

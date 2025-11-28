@@ -1,5 +1,5 @@
-import { FirebaseRepository } from '../firebase.repository';
-import { IDatabaseOperations } from '../../database/types';
+import { BaseRepository } from '../base.repository';
+import { IMenuRepository } from '../interfaces/menu.repository.interface';
 import { QueryFilter } from '../types';
 
 export interface MenuItem {
@@ -13,15 +13,19 @@ export interface MenuItem {
 export interface Menu {
   id: string;
   placeId: string;
-  items: MenuItem[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export class MenuRepository extends FirebaseRepository<Menu> {
-  constructor(client: IDatabaseOperations) {
-    super(client, 'menus');
+/**
+ * Menu Repository - Extends BaseRepository, Implements IMenuRepository
+ * Follows SOLID principles and Clean Architecture
+ * NO business logic - only data access operations
+ */
+export class MenuRepository extends BaseRepository<Menu> implements IMenuRepository {
+  constructor() {
+    super('menus');
   }
 
   async getByPlaceId(placeId: string): Promise<Menu | null> {

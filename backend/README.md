@@ -110,3 +110,5 @@ src/
 | `NODE_ENV` | Environment (development/production) | No |
 | `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) | No |
 
+
+

@@ -1,19 +1,26 @@
-export type QueryOperator = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'array-contains' | 'in' | 'not-in' | 'array-contains-any';
-
-export interface QueryFilter {
-  field: string;
-  operator: QueryOperator;
-  value: unknown;
-}
-
+/**
+ * Base Model Interface - All entities must extend this
+ */
 export interface BaseModel {
   id: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
+/**
+ * Query Filter for database operations
+ */
+export interface QueryFilter {
+  field: string;
+  operator: '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in' | 'not-in' | 'array-contains' | 'array-contains-any';
+  value: unknown;
+}
+
+/**
+ * Query Options for advanced querying
+ */
 export interface QueryOptions {
-  orderBy?: { field: string; direction: 'asc' | 'desc' }[];
   limit?: number;
   offset?: number;
+  orderBy?: { field: string; direction: 'asc' | 'desc' }[];
 }

@@ -479,3 +479,345 @@ Controller → Service → Repository → Database
     ↓           ↓         ↓
   NO LOGIC   ALL LOGIC  NO LOGIC
 ```
+
+# TabNorder Backend - API Structure Rules
+
+## RESTful API Structure Standards (Firebase Functions)
+
+### Core Principles
+
+1. **Single Resource Endpoint**: Each resource (items, orders, etc.) should have ONE Firebase Function that handles all operations
+2. **Simple Path Structure**: Use path parameters ONLY for resource IDs, NO nested paths
+3. **Query Parameters for Everything Else**: All filters, searches, and operations use query parameters
+4. **HTTP Methods**: Use proper HTTP methods for operations:
+   - `GET` - Retrieve data (list or single item)
+   - `POST` - Create new resource
+   - `PUT` - Update existing resource (full update)
+   - `DELETE` - Delete resource
+
+### Standard API Structure Pattern
+
+#### Resource Endpoints
+
+```
+GET    /items              - List items with optional filters (query params)
+POST   /items              - Create new item
+GET    /items/{id}         - Get single item by ID
+PUT    /items/{id}         - Update item by ID
+DELETE /items/{id}         - Delete item by ID
+```
+
+#### Query Parameters for Filtering
+
+All filters use query parameters on the collection endpoint:
+
+```
+GET /items?category_id=xxx&menu_id=xxx&is_available=true&search=xxx
+```
+
+**Query Parameters Pattern:**
+- Use snake_case for parameter names: `category_id`, `menu_id`, `is_available`
+- Combine multiple filters: `/items?category_id=xxx&menu_id=xxx&is_available=true`
+- Use query params for all filtering, searching, and operations
+
+**Examples:**
+- ✅ `GET /items?category_id=123` - Get items by category
+- ✅ `GET /items?menu_id=456&is_available=true` - Get available items in menu
+- ✅ `GET /items?search=pizza` - Search items
+- ✅ `GET /items?category_id=123&is_available=true&limit=10` - Multiple filters
+
+**NOT Separate Endpoints:**
+- ❌ `/items/category` 
+- ❌ `/items/available`
+- ❌ `/items/search`
+- ❌ `/items/{id}/status`
+- ❌ `/cart/{cartId}/discount`
+- ❌ `/cart/{cartId}/items`
+
+**Instead Use Query Parameters:**
+- ✅ `/items?category_id=xxx`
+- ✅ `/items?is_available=true`
+- ✅ `/items?search=xxx`
+- ✅ `/cart?cart_id=xxx&action=apply_discount&discount_code=xxx`
+- ✅ `/cart?cart_id=xxx&action=add_item&item_id=xxx&quantity=2`
+
+### Implementation Pattern (Firebase Functions)
+
+#### 1. Single Firebase Function per Resource
+
+```typescript
+export const items = onRequest({
+  maxInstances: 10,
+  cors: corsOrigins
+}, async (request, response) => {
+  try {
+    const wasHandled = CorsMiddleware.handleCors(request, response);
+    if (wasHandled) return;
+
+    const controller = new ItemsController();
+    
+    // Extract path and parse it
+    const path = request.path || request.url.split('?')[0];
+    const pathParts = path.split('/').filter(p => p);
+    
+    // Extract ID from path: /items/{id}
+    // pathParts[0] = 'items', pathParts[1] = '{id}' (if exists)
+    const resourceId = pathParts[1]; // ID is second segment (after 'items')
+
+    if (request.method === 'GET') {
+      if (resourceId) {
+        // GET /items/{id} - Get single item
+        await controller.getItemById(request, response);
+      } else {
+        // GET /items?category_id=xxx&menu_id=xxx - List with filters
+        await controller.getItems(request, response);
+      }
+    }
+    else if (request.method === 'POST') {
+      // POST /items - Create new item
+      await controller.createItem(request, response);
+    }
+    else if (request.method === 'PUT') {
+      if (resourceId) {
+        // PUT /items/{id} - Update item
+        await controller.updateItem(request, response);
+      } else {
+        response.status(400).json({ success: false, message: 'Item ID required' });
+      }
+    }
+    else if (request.method === 'DELETE') {
+      if (resourceId) {
+        // DELETE /items/{id} - Delete item
+        await controller.deleteItem(request, response);
+      } else {
+        response.status(400).json({ success: false, message: 'Item ID required' });
+      }
+    }
+    else {
+      response.status(405).json({ success: false, message: 'Method not allowed' });
+    }
+  } catch (error) {
+    // Error handling
+  }
+});
+```
+
+#### 2. Path Parameter Extraction (Firebase Functions)
+
+```typescript
+// Extract ID from Firebase Functions request
+const path = request.path || request.url.split('?')[0];
+const pathParts = path.split('/').filter(p => p);
+
+// Examples:
+// /items/123 -> pathParts = ['items', '123'], resourceId = '123'
+// /items?category_id=xxx -> pathParts = ['items'], resourceId = undefined
+// /orders/456 -> pathParts = ['orders', '456'], resourceId = '456'
+
+const resourceId = pathParts[1]; // ID is always second segment
+// NO nested paths - keep it simple!
+```
+
+#### 3. Controller Method for List with Filters
+
+```typescript
+/**
+ * Get items with optional filters
+ * GET /items?category_id=xxx&menu_id=xxx&is_available=true&search=xxx
+ */
+getItems = async (request: Request, response: Response): Promise<void> => {
+  try {
+    const query: ItemQuery = {
+      menuId: request.query.menu_id as string,
+      categoryId: request.query.category_id as string,
+      isAvailable: request.query.is_available === 'true' ? true : 
+                  request.query.is_available === 'false' ? false : undefined,
+      search: (request.query.search || request.query.q) as string
+    };
+
+    const items = await this.itemService.queryItems(query);
+    
+    response.status(200).json({
+      success: true,
+      data: items,
+      count: items.length
+    });
+  } catch (error) {
+    this.handleError(response, error);
+  }
+};
+```
+
+### Order API Structure
+
+#### Standard Order Endpoints
+
+```
+GET    /orders                    - List orders with filters (query params)
+POST   /orders                    - Create new order
+GET    /orders/{id}               - Get order by ID
+PUT    /orders/{id}               - Update order (use query param for status: ?status=xxx)
+DELETE /orders/{id}               - Delete order
+```
+
+#### Query Parameters for Orders
+
+```
+GET /orders?place_id=xxx&status=xxx&type=xxx&customer_id=xxx&date_from=xxx&date_to=xxx&order_number=xxx
+```
+
+**Query Parameters (snake_case):**
+- `place_id` - Filter by place ID
+- `status` - Filter by status (pending, confirmed, preparing, ready, completed, cancelled)
+- `type` - Filter by type (dine_in, takeout, delivery, pickup)
+- `customer_id` - Filter by customer ID
+- `date_from` - Filter from date (ISO date-time)
+- `date_to` - Filter to date (ISO date-time)
+- `order_number` - Filter by order number
+- `source` - Filter by source (pos, online, mobile_app, phone)
+- `search` or `q` - Search term
+
+**Update Order Status:**
+- `PUT /orders/{id}?status=confirmed&last_updated_by=user123` - Update status via query param
+
+### Real-time Endpoints
+
+Real-time endpoints are separate functions:
+
+```
+GET /ordersRealtime?place_id=xxx&status=xxx
+GET /orderRealtimeStatus?place_id=xxx&status=xxx
+GET /orderRealtimeSingle?id=xxx
+```
+
+### Cart API Structure
+
+```
+GET    /cart/{id}                 - Get cart by ID
+POST   /cart                      - Create new cart
+PUT    /cart/{id}                 - Update cart
+DELETE /cart/{id}                - Delete cart
+GET    /cart?place_id=xxx         - Get carts by place (with filters)
+GET    /cart?customer_id=xxx     - Get carts by customer (with filters)
+GET    /cart?customer_id=xxx&place_id=xxx&status=active - Get active cart
+POST   /cart?cart_id=xxx&action=add_item&item_id=xxx&quantity=2 - Add item
+PUT    /cart?cart_id=xxx&item_id=xxx&action=update&quantity=3 - Update item
+DELETE /cart?cart_id=xxx&item_id=xxx&action=remove_item - Remove item
+POST   /cart?cart_id=xxx&action=clear - Clear all items
+POST   /cart?cart_id=xxx&action=apply_discount&discount_code=xxx - Apply discount
+DELETE /cart?cart_id=xxx&action=remove_discount - Remove discount
+POST   /cart?cart_id=xxx&action=convert - Convert cart to order
+```
+
+**Key Principle:** Use query parameters with `action` parameter for cart operations, NOT nested paths!
+
+### Path Parameter Naming
+
+- Use `{id}` for resource IDs ONLY: `/items/{id}`, `/orders/{id}`, `/cart/{id}`
+- **NO nested paths**: ❌ `/cart/{cartId}/discount`, ❌ `/orders/{id}/status`
+- **Use query parameters instead**: ✅ `/cart?cart_id=xxx&action=apply_discount`
+
+### Error Responses
+
+All endpoints should return consistent error responses:
+
+```typescript
+{
+  "success": false,
+  "message": "Error message",
+  "error": "Error type",
+  "errors": ["Array of validation errors"]
+}
+```
+
+### Success Responses
+
+```typescript
+{
+  "success": true,
+  "data": { /* resource data */ },
+  "message": "Success message",
+  "count": 10, // For list endpoints
+  "metadata": {
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "version": "1.0.0",
+    "requestId": "xxx"
+  }
+}
+```
+
+### Firebase Functions Naming
+
+Firebase Functions are named after the resource, not the operation:
+
+- ✅ `export const items = onRequest(...)` → `/items`
+- ✅ `export const orders = onRequest(...)` → `/orders`
+- ✅ `export const cart = onRequest(...)` → `/cart`
+- ❌ `export const itemDetail = onRequest(...)` → `/itemDetail` (WRONG)
+- ❌ `export const orderDetail = onRequest(...)` → `/orderDetail` (WRONG)
+
+### Migration Checklist
+
+When refactoring to this structure:
+
+1. ✅ Consolidate multiple functions into single resource function
+2. ✅ Implement path parameter extraction from `request.path`
+3. ✅ Move all filter logic to query parameters
+4. ✅ Remove separate endpoints for category, search, available, etc.
+5. ✅ Update Swagger documentation to match actual implementation
+6. ✅ Ensure all controller methods are properly routed
+7. ✅ Test all query parameter combinations
+8. ✅ Verify path parameter extraction works correctly
+
+### Examples
+
+#### Good Structure ✅
+
+```typescript
+// Single function handles all item operations
+export const items = onRequest({...}, async (request, response) => {
+  const pathParts = request.path.split('/').filter(p => p);
+  const itemId = pathParts[1];
+  
+  if (request.method === 'GET' && itemId) {
+    // GET /items/{id}
+  } else if (request.method === 'GET') {
+    // GET /items?category_id=xxx&menu_id=xxx
+  } else if (request.method === 'POST') {
+    // POST /items
+  }
+  // etc.
+});
+```
+
+#### Bad Structure ❌
+
+```typescript
+// Multiple functions for same resource
+export const items = onRequest({...}, ...); // Only GET /items?menu_id=xxx
+export const itemDetail = onRequest({...}, ...); // GET /itemDetail/{id}
+export const itemsCategory = onRequest({...}, ...); // GET /itemsCategory?category=xxx
+
+// Nested paths (DON'T DO THIS)
+export const cartDiscount = onRequest({...}, ...); // POST /cart/{cartId}/discount
+export const cartItems = onRequest({...}, ...); // POST /cart/{cartId}/items
+
+// Instead use query parameters:
+// POST /cart?cart_id=xxx&action=apply_discount&discount_code=xxx
+// POST /cart?cart_id=xxx&action=add_item&item_id=xxx&quantity=2
+```
+
+### Summary
+
+- **One Firebase Function per resource** (items, orders, cart, etc.)
+- **Path parameters ONLY for resource IDs**: `/items/{id}`, `/orders/{id}`, `/cart/{id}`
+- **Query parameters for EVERYTHING ELSE**: 
+  - Filters: `/items?category_id=xxx&menu_id=xxx`
+  - Actions: `/cart?cart_id=xxx&action=apply_discount`
+  - Search: `/items?search=xxx`
+- **NO nested paths**: ❌ `/cart/{cartId}/discount`, ✅ `/cart?cart_id=xxx&action=apply_discount`
+- **Use snake_case for query parameters**: `category_id`, `menu_id`, `is_available`
+- **HTTP methods for operations**: GET, POST, PUT, DELETE
+- **No separate endpoints for filters**: Use query params instead
+- **Consistent error/success responses**
+- **Proper path parsing** from `request.path` (Firebase Functions)

@@ -5,14 +5,13 @@ export interface MenuItem {
   name: string;
   description?: string;
   price: number;
-  category?: string;
-  imageUrl?: string;
   available: boolean;
 }
 
 export interface Menu extends BaseModel {
   placeId: string;
-  items: MenuItem[];
+  name?: string;
+  description?: string;
   categories?: string[];
   isActive: boolean;
 }
