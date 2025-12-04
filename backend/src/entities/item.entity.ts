@@ -39,6 +39,7 @@ export interface Item {
     fiber?: number;
   }
   menuId?: string; // Reference to the menu this item belongs to (optional)
+  branchId?: string; // Reference to the branch this item belongs to (optional)
   addonGroups?: ItemAddonGroup[]; // Inline addon group definitions that can be selected with this item
   addonGroupIds?: string[]; // References to reusable addon groups
   createdAt: Date;
@@ -63,6 +64,8 @@ export interface CreateItemCommand {
     fiber?: number;
   }
   menuId?: string;
+  placeId?: string; // Reference to the place (will get menu by placeId if menuId not provided)
+  branchId?: string; // Reference to the branch this item belongs to (optional)
   addonGroups?: ItemAddonGroup[]; // Inline addon group definitions available for this item
   addonGroupIds?: string[]; // References to reusable addon groups associated with this item
 }
@@ -87,10 +90,13 @@ export interface UpdateItemCommand {
   }
   addonGroups?: ItemAddonGroup[]; // Inline addon group definitions available for this item
   addonGroupIds?: string[]; // References to reusable addon groups associated with this item
+  branchId?: string; // Reference to the branch this item belongs to (optional)
 }
 
 export interface ItemQuery {
   menuId?: string;
+  placeId?: string; // Filter by place ID (will get menu by placeId, then items by menuId)
+  branchId?: string; // Filter by branch ID
   categoryId?: string; // Filter by category ID
   isAvailable?: boolean;
   search?: string;
