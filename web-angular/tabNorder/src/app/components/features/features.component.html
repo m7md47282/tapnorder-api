@@ -1,0 +1,60 @@
+<section class="py-20 bg-muted/30">
+  <div class="container mx-auto px-6">
+    <div class="text-center mb-16">
+      <h2 class="text-4xl lg:text-5xl font-bold text-foreground mb-6">
+        Powerful <span class="gradient-text">Features</span>
+      </h2>
+      <p class="text-xl text-muted-foreground max-w-3xl mx-auto">
+        Everything you need to modernize your restaurant and delight your customers.
+      </p>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div 
+        *ngFor="let feature of features; let i = index"
+        class="group relative bg-card rounded-3xl p-8 shadow-elegant hover:shadow-glow transition-all duration-500 hover:-translate-y-2"
+      >
+        <!-- Gradient background on hover -->
+        <div class="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-5 rounded-3xl transition-opacity duration-500" [class]="feature.gradient"></div>
+        
+        <!-- Icon -->
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br p-0.5 mb-6 group-hover:scale-110 transition-transform duration-300" [class]="feature.gradient">
+          <div class="w-full h-full bg-card rounded-2xl flex items-center justify-center">
+            <span class="text-3xl">{{ feature.icon }}</span>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <h3 class="text-xl font-bold text-card-foreground mb-4 group-hover:text-primary transition-colors duration-300">
+          {{ feature.title }}
+        </h3>
+        <p class="text-muted-foreground leading-relaxed">
+          {{ feature.description }}
+        </p>
+
+        <!-- Decorative element -->
+        <div class="absolute top-4 right-4 w-2 h-2 bg-primary/20 rounded-full group-hover:bg-primary/40 transition-colors duration-300"></div>
+      </div>
+    </div>
+
+    <!-- Bottom stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mt-16 pt-16 border-t border-border">
+      <div class="text-center">
+        <div class="text-3xl font-bold text-primary mb-2">99.9%</div>
+        <div class="text-muted-foreground">Uptime</div>
+      </div>
+      <div class="text-center">
+        <div class="text-3xl font-bold text-secondary mb-2">24/7</div>
+        <div class="text-muted-foreground">Support</div>
+      </div>
+      <div class="text-center">
+        <div class="text-3xl font-bold text-primary mb-2">1000+</div>
+        <div class="text-muted-foreground">Restaurants</div>
+      </div>
+      <div class="text-center">
+        <div class="text-3xl font-bold text-secondary mb-2">2M+</div>
+        <div class="text-muted-foreground">Orders</div>
+      </div>
+    </div>
+  </div>
+</section>

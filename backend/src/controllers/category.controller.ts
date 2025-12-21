@@ -36,10 +36,22 @@ export class CategoryController {
         });
       }
 
+      if (!req.body.placeId && !req.body.place_id) {
+        throw new MissingRequiredFieldError('placeId', {
+          field: 'placeId',
+          value: req.body.placeId || req.body.place_id,
+          suggestion: 'Provide placeId in the request body'
+        });
+      }
+
       const command: CreateCategoryCommand = {
         name: req.body.name,
         description: req.body.description,
         menuId: req.body.menuId,
+        placeId: req.body.placeId || req.body.place_id, // Support both camelCase and snake_case
+        branchId: req.body.branchId !== null && req.body.branchId !== undefined 
+          ? (req.body.branchId || req.body.branch_id) 
+          : undefined, // Support both camelCase and snake_case, handle null
         displayOrder: req.body.displayOrder,
         isActive: req.body.isActive,
         imageUrl: req.body.imageUrl
@@ -83,10 +95,20 @@ export class CategoryController {
         return;
       }
 
+      if (!req.body.placeId && !req.body.place_id) {
+        res.status(400).json({
+          success: false,
+          message: 'Place ID is required. Provide it in the request body ({"placeId": "..."})'
+        });
+        return;
+      }
+
       const command: UpdateCategoryCommand = {
         id: categoryId,
         name: req.body.name,
         description: req.body.description,
+        placeId: req.body.placeId || req.body.place_id, // Support both camelCase and snake_case
+        branchId: req.body.branchId || req.body.branch_id, // Support both camelCase and snake_case
         displayOrder: req.body.displayOrder,
         isActive: req.body.isActive,
         imageUrl: req.body.imageUrl
@@ -286,8 +308,19 @@ export class CategoryController {
         return;
       }
       // Support both camelCase (preferred) and snake_case (backward compatibility)
+      const placeId = (req.query.placeId || req.query.place_id) as string | undefined;
+      if (!placeId) {
+        res.status(400).json({
+          success: false,
+          message: 'Place ID is required. Provide it as a query parameter (?placeId=...)'
+        });
+        return;
+      }
+
       const query: CategoryQuery = {
         menuId: (req.query.menuId || req.query.menu_id) as string | undefined,
+        placeId: placeId,
+        branchId: (req.query.branchId || req.query.branch_id) as string | undefined,
         isActive: req.query.isActive === 'true' || req.query.is_active === 'true' ? true : 
                   req.query.isActive === 'false' || req.query.is_active === 'false' ? false : undefined,
         search: (req.query.search || req.query.q) as string | undefined

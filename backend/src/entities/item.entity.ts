@@ -20,16 +20,30 @@ export interface ItemAddonGroup {
   }>;
 }
 
+/**
+ * Item Recipe Ingredient
+ * Represents an ingredient in an item recipe with quantity and unit
+ */
+export interface ItemRecipeIngredient {
+  inventoryId: string;        // Reference to inventory item
+  ingredientName: string;      // e.g., "Coffee", "Milk"
+  quantity: number;           // e.g., 9 (grams), 0.2 (liters)
+  unit: 'kilogram' | 'gram' | 'liter' | 'milliliter' | 'piece' | 'cup';
+}
+
 export interface Item {
   id: string;
   name: string;
   description?: string;
-  price: number;
+  price: number;              // Selling price (can be set manually or calculated with markup)
+  calculatedCost?: number;     // Auto-calculated cost from ingredients (backend only)
+  availableUnits?: number;    // Auto-calculated: how many units can be made (backend only)
   categoryId: string; // Reference to the category this item belongs to
   imageUrl?: string;
   isAvailable: boolean;
   preparationTime?: number; // in minutes
-  ingredients?: string[];
+  recipe?: ItemRecipeIngredient[]; // Structured recipe with quantities (replaces ingredients)
+  ingredients?: string[];    // Legacy: kept for backward compatibility (display only)
   specs: {
     allergens?: string[];
     calories?: number;
@@ -39,6 +53,7 @@ export interface Item {
     fiber?: number;
   }
   menuId?: string; // Reference to the menu this item belongs to (optional)
+  placeId?: string; // Reference to the place this item belongs to (optional)
   branchId?: string; // Reference to the branch this item belongs to (optional)
   addonGroups?: ItemAddonGroup[]; // Inline addon group definitions that can be selected with this item
   addonGroupIds?: string[]; // References to reusable addon groups
@@ -49,12 +64,13 @@ export interface Item {
 export interface CreateItemCommand {
   name: string;
   description?: string;
-  price: number;
+  price?: number;             // Optional: selling price (if not provided, will use calculatedCost * markup)
   categoryId: string; // Reference to the category this item belongs to
   imageUrl?: string;
   isAvailable?: boolean;
   preparationTime?: number;
-  ingredients?: string[];
+  recipe?: ItemRecipeIngredient[]; // Recipe with ingredient quantities (required for cost calculation)
+  ingredients?: string[];     // Legacy: kept for backward compatibility (display only)
   specs: {
     allergens?: string[];
     calories?: number;
@@ -74,12 +90,13 @@ export interface UpdateItemCommand {
   id: string;
   name?: string;
   description?: string;
-  price?: number;
+  price?: number;             // Optional: selling price
   categoryId?: string; // Reference to the category this item belongs to
   imageUrl?: string;
   isAvailable?: boolean;
   preparationTime?: number;
-  ingredients?: string[];
+  recipe?: ItemRecipeIngredient[]; // Recipe with ingredient quantities
+  ingredients?: string[];     // Legacy: kept for backward compatibility (display only)
   specs: {
     allergens?: string[];
     calories?: number;

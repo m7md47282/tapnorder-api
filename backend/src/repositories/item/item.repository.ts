@@ -5,6 +5,12 @@ import { QueryFilter } from '../types';
 export interface IItemRepository {
   getAll(): Promise<Item[]>;
   getByMenuId(menuId: string): Promise<Item[]>;
+  getByPlaceId(placeId: string): Promise<Item[]>;
+  getByBranchId(branchId: string): Promise<Item[]>;
+  getByMenuIdAndBranchId(menuId: string, branchId: string): Promise<Item[]>;
+  getSharedItemsByMenuId(menuId: string): Promise<Item[]>; // Items with menuId but no branchId (shared across branches)
+  getSharedItemsByPlaceId(placeId: string): Promise<Item[]>; // Items with placeId but no branchId (shared across branches)
+  getByPlaceIdAndBranchId(placeId: string, branchId: string): Promise<Item[]>; // Items with placeId and branchId
   getByCategoryId(menuId: string, categoryId: string): Promise<Item[]>;
   getByCategoryIdOnly(categoryId: string): Promise<Item[]>;
   getAvailableItems(menuId: string): Promise<Item[]>;
@@ -55,6 +61,56 @@ export class ItemRepository extends BaseRepository<Item> implements IItemReposit
   async getByMenuId(menuId: string): Promise<Item[]> {
     const filters: QueryFilter[] = [
       { field: 'menuId', operator: '==', value: menuId }
+    ];
+    return this.query(filters);
+  }
+
+  async getByPlaceId(placeId: string): Promise<Item[]> {
+    const filters: QueryFilter[] = [
+      { field: 'placeId', operator: '==', value: placeId }
+    ];
+    return this.query(filters);
+  }
+
+  async getByBranchId(branchId: string): Promise<Item[]> {
+    const filters: QueryFilter[] = [
+      { field: 'branchId', operator: '==', value: branchId }
+    ];
+    return this.query(filters);
+  }
+
+  async getByMenuIdAndBranchId(menuId: string, branchId: string): Promise<Item[]> {
+    const filters: QueryFilter[] = [
+      { field: 'menuId', operator: '==', value: menuId },
+      { field: 'branchId', operator: '==', value: branchId }
+    ];
+    return this.query(filters);
+  }
+
+  async getSharedItemsByMenuId(menuId: string): Promise<Item[]> {
+    // Get items with menuId but no branchId (shared across all branches)
+    const filters: QueryFilter[] = [
+      { field: 'menuId', operator: '==', value: menuId }
+    ];
+    const allMenuItems = await this.query(filters);
+    // Filter items where branchId is null or undefined
+    return allMenuItems.filter(item => !item.branchId);
+  }
+
+  async getSharedItemsByPlaceId(placeId: string): Promise<Item[]> {
+    // Get items with placeId but no branchId (shared across all branches)
+    const filters: QueryFilter[] = [
+      { field: 'placeId', operator: '==', value: placeId }
+    ];
+    const allPlaceItems = await this.query(filters);
+    // Filter items where branchId is null or undefined
+    return allPlaceItems.filter(item => !item.branchId);
+  }
+
+  async getByPlaceIdAndBranchId(placeId: string, branchId: string): Promise<Item[]> {
+    const filters: QueryFilter[] = [
+      { field: 'placeId', operator: '==', value: placeId },
+      { field: 'branchId', operator: '==', value: branchId }
     ];
     return this.query(filters);
   }

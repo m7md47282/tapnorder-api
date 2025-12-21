@@ -11,8 +11,14 @@ import { CartController } from './controllers/cart.controller';
 import { AuthController } from './controllers/auth.controller';
 import { AttachmentController } from './controllers/attachment.controller';
 import { AddonGroupController } from './controllers/addon-group.controller';
+import { UserController } from './controllers/user.controller';
+import { BranchController } from './controllers/branch.controller';
+import { InventoryController } from './controllers/inventory.controller';
+import { TableController } from './controllers/table.controller';
 import { CorsMiddleware } from './shared/middleware/cors.middleware';
 import { CorsConfigFactory } from './shared/config/cors.config';
+import { RequestParamsMiddleware } from './shared/middleware/request-params.middleware';
+import { AuthMiddleware, AuthenticatedRequest } from './shared/middleware/auth.middleware';
 
 // Initialize Firebase Admin ONCE at application level
 initializeApp({
@@ -108,6 +114,43 @@ export const signup = onRequest({
   }
 });
 
+// Administrative user management endpoint
+// GET /users?placeId=xxx - Get users by place ID (super admin or place admin)
+// POST /users - Create users (super admin or place admin)
+export const users = onRequest({
+  maxInstances: 10,
+  cors: corsOrigins
+}, async (request, response) => {
+  try {
+    const wasHandled = CorsMiddleware.handleCors(request, response);
+    if (wasHandled) return;
+
+    const controller = new UserController();
+
+    // Attach authenticated user for authorization
+    await AuthMiddleware.attachAuthenticatedUser(request as AuthenticatedRequest);
+
+    if (request.method === 'GET') {
+      await controller.getUsers(request as AuthenticatedRequest, response);
+    } else if (request.method === 'POST') {
+      await controller.createUser(request as AuthenticatedRequest, response);
+    } else {
+      response.status(405).json({
+        success: false,
+        message: 'Method not allowed'
+      });
+    }
+  } catch (error) {
+    console.error('Users endpoint error:', error);
+    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+    response.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export const menu = onRequest({
   maxInstances: 10,
   cors: corsOrigins
@@ -153,18 +196,8 @@ export const items = onRequest({
 
     const controller = new ItemsController();
 
-    // Extract path and parse it for all methods
-    const path = request.path || request.url?.split('?')[0] || '/items';
-    const pathParts = path.split('/').filter(p => p);
-    
-    // Extract ID from path: /items/{id}
-    const resourceId = pathParts[1]; // ID is second segment (after 'items')
-    
-    // Set resourceId in req.params[0] for controller methods that need it
-    if (resourceId) {
-      request.params = request.params || {};
-      request.params[0] = resourceId;
-    }
+    // Extract and set resource ID from path or query parameters
+    const resourceId = RequestParamsMiddleware.extractAndSetResourceId(request, 'item', 1);
 
     if(request.method === 'POST')
       await controller.createItem(request, response);
@@ -212,6 +245,9 @@ export const itemDetail = onRequest({
 
     const controller = new ItemsController();
 
+    // Extract and set resource ID from path or query parameters
+    RequestParamsMiddleware.extractAndSetResourceId(request, 'item', 1);
+
     if(request.method === 'GET')
       await controller.getItemById(request, response);
 
@@ -258,12 +294,8 @@ export const categories = onRequest({
       await controller.deleteCategory(request, response);
 
     else if(request.method === 'GET') {
-      // Extract path and parse it
-      const path = request.path || request.url?.split('?')[0] || '/categories';
-      const pathParts = path.split('/').filter(p => p);
-      
-      // Extract ID from path: /categories/{id}
-      const resourceId = pathParts[1]; // ID is second segment (after 'categories')
+      // Extract and set resource ID from path or query parameters
+      const resourceId = RequestParamsMiddleware.extractAndSetResourceId(request, 'category', 1);
 
       if (resourceId) {
         // GET /categories/{id} - Get single category
@@ -300,6 +332,9 @@ export const place = onRequest({
 
     const controller = new PlaceController();
 
+    // Extract and set resource ID from path or query parameters
+    RequestParamsMiddleware.extractAndSetResourceId(request, 'place', 1);
+
     if(request.method === 'POST')
       await controller.createPlace(request, response);
 
@@ -327,6 +362,39 @@ export const place = onRequest({
   }
 });
 
+// Places listing endpoint (for super admin / admin UIs)
+// GET /places?ownerId=xxx&status=active&city=...&state=...&allowOnlineOrders=true
+export const places = onRequest({
+  maxInstances: 10,
+  cors: corsOrigins
+}, async (request, response) => {
+  try {
+    // Handle CORS
+    const wasHandled = CorsMiddleware.handleCors(request, response);
+    if (wasHandled) return;
+
+    const controller = new PlaceController();
+
+    if (request.method === 'GET') {
+      // When called without filters, this returns all places.
+      await controller.queryPlaces(request, response);
+    } else {
+      response.status(405).json({
+        success: false,
+        message: 'Method not allowed'
+      });
+    }
+  } catch (error) {
+    console.error('Places endpoint error:', error);
+    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+    response.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Order endpoints
 export const orders = onRequest({
   maxInstances: 10,
@@ -338,6 +406,10 @@ export const orders = onRequest({
     if (wasHandled) return;
 
     const controller = new OrderController();
+
+    // Attach authenticated user if present (allows guest orders)
+    // Guest orders don't require authentication
+    await AuthMiddleware.attachAuthenticatedUserIfPresent(request as AuthenticatedRequest);
 
     if (request.method === 'POST')
       await controller.createOrder(request, response);
@@ -373,6 +445,9 @@ export const orderDetail = onRequest({
     if (wasHandled) return;
 
     const controller = new OrderController();
+
+    // Extract and set resource ID from path or query parameters
+    RequestParamsMiddleware.extractAndSetResourceId(request, 'order', 1);
 
     if (request.method === 'GET')
       await controller.getOrderById(request, response);
@@ -434,6 +509,9 @@ export const ordersRealtime = onRequest({
   maxInstances: 10,
   cors: corsOrigins
 }, async (request, response) => {
+  // Track if headers have been sent (for SSE streams)
+  let headersSent = false;
+  
   try {
     // Handle CORS
     const wasHandled = CorsMiddleware.handleCors(request, response);
@@ -441,23 +519,42 @@ export const ordersRealtime = onRequest({
 
     const controller = new OrderRealtimeController();
 
-    if (request.method === 'GET')
+    if (request.method === 'GET') {
+      // Check if response headers are already sent (SSE case)
+      headersSent = response.headersSent;
       await controller.getRealtimeOrders(request, response);
-
-    else
+    } else {
       response.status(405).json({
         success: false,
         message: 'Method not allowed'
       });
+    }
 
   } catch (error) {
     console.error('Order realtime endpoint error:', error);
-    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
-    response.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    
+    // If headers are already sent (SSE stream started), send SSE error event
+    if (headersSent || response.headersSent) {
+      try {
+        response.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: 'Internal server error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        })}\n\n`);
+        response.end();
+      } catch (writeError) {
+        console.error('Error writing SSE error event:', writeError);
+      }
+    } else {
+      // Headers not sent yet, send JSON error response
+      CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+      response.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 });
 
@@ -466,6 +563,9 @@ export const orderRealtimeStatus = onRequest({
   maxInstances: 10,
   cors: corsOrigins
 }, async (request, response) => {
+  // Track if headers have been sent (for SSE streams)
+  let headersSent = false;
+  
   try {
     // Handle CORS
     const wasHandled = CorsMiddleware.handleCors(request, response);
@@ -473,23 +573,42 @@ export const orderRealtimeStatus = onRequest({
 
     const controller = new OrderRealtimeController();
 
-    if (request.method === 'GET')
+    if (request.method === 'GET') {
+      // Check if response headers are already sent (SSE case)
+      headersSent = response.headersSent;
       await controller.getRealtimeOrdersByStatus(request, response);
-
-    else
+    } else {
       response.status(405).json({
         success: false,
         message: 'Method not allowed'
       });
+    }
 
   } catch (error) {
     console.error('Order realtime status endpoint error:', error);
-    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
-    response.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    
+    // If headers are already sent (SSE stream started), send SSE error event
+    if (headersSent || response.headersSent) {
+      try {
+        response.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: 'Internal server error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        })}\n\n`);
+        response.end();
+      } catch (writeError) {
+        console.error('Error writing SSE error event:', writeError);
+      }
+    } else {
+      // Headers not sent yet, send JSON error response
+      CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+      response.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 });
 
@@ -498,30 +617,60 @@ export const orderRealtimeSingle = onRequest({
   maxInstances: 10,
   cors: corsOrigins
 }, async (request, response) => {
+  let headersSent = false;
+  
   try {
-    // Handle CORS
+
     const wasHandled = CorsMiddleware.handleCors(request, response);
     if (wasHandled) return;
+    
+    let orderId = RequestParamsMiddleware.extractResourceId(request, 'order', 0);
+    if (!orderId) {
+      orderId = RequestParamsMiddleware.extractResourceId(request, 'order', 1);
+    }
+    
+    if (!request.params) request.params = {};
+    if (orderId) {
+      request.params.id = orderId;
+    }
 
     const controller = new OrderRealtimeController();
 
-    if (request.method === 'GET')
+    if (request.method === 'GET') {
+      headersSent = response.headersSent;
       await controller.getRealtimeOrder(request, response);
-
-    else
+    } else {
       response.status(405).json({
         success: false,
         message: 'Method not allowed'
       });
+    }
 
   } catch (error) {
     console.error('Order realtime single endpoint error:', error);
-    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
-    response.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    
+    // If headers are already sent (SSE stream started), send SSE error event
+    if (headersSent || response.headersSent) {
+      try {
+        response.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: 'Internal server error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        })}\n\n`);
+        response.end();
+      } catch (writeError) {
+        console.error('Error writing SSE error event:', writeError);
+      }
+    } else {
+      // Headers not sent yet, send JSON error response
+      CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+      response.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 });
 
@@ -536,6 +685,9 @@ export const cart = onRequest({
     if (wasHandled) return;
 
     const controller = new CartController();
+
+    // Extract and set resource ID from path or query parameters
+    RequestParamsMiddleware.extractAndSetResourceId(request, 'cart', 1);
 
     if (request.method === 'POST')
       await controller.createCart(request, response);
@@ -907,12 +1059,15 @@ export const attachments = onRequest({
 
     const controller = new AttachmentController();
 
-    // Extract path and parse it
+    // Extract path and parse it for nested routes (signed-url)
     const requestPath = request.path || request.url?.split('?')[0] || '';
     const pathParts = requestPath.split('/').filter(p => p);
     
-    // Extract ID from path: /attachments/{id} or /attachments/{id}/signed-url
-    const resourceId = pathParts[1]; // ID is second segment (after 'attachments')
+    // Extract ID from path or query parameters
+    const resourceId = RequestParamsMiddleware.extractResourceId(request, 'attachment', 1);
+    RequestParamsMiddleware.setResourceIdInParams(request, resourceId);
+    
+    // Extract action from path (e.g., 'signed-url')
     const action = pathParts[2]; // Third segment for actions like 'signed-url'
 
     if (request.method === 'GET') {
@@ -965,25 +1120,8 @@ export const addonGroups = onRequest({
 
     const controller = new AddonGroupController();
 
-    // Extract path and parse it
-    const path = request.path || request.url?.split('?')[0] || '/addonGroups';
-    const pathParts = path.split('/').filter(p => p);
-    
-    // Extract ID from path: /addonGroups/{id} or /{id} (Firebase Functions v2 may return relative path)
-    // Try pathParts[1] first (if path includes 'addonGroups'), then pathParts[0] (if path is just /{id})
-    let resourceId = pathParts[1]; // ID is second segment (after 'addonGroups')
-    
-    // If pathParts[1] is undefined, try pathParts[0] (for relative paths like /{id})
-    // But only if pathParts[0] is not 'addonGroups'
-    if (!resourceId && pathParts[0] && pathParts[0] !== 'addonGroups') {
-      resourceId = pathParts[0];
-    }
-    
-    // Set resourceId in req.params[0] for controller methods that need it
-    if (resourceId) {
-      request.params = request.params || {};
-      request.params[0] = resourceId;
-    }
+    // Extract and set resource ID from path or query parameters
+    const resourceId = RequestParamsMiddleware.extractAndSetResourceId(request, 'addonGroup', 1);
 
     if (request.method === 'GET') {
       if (resourceId) {
@@ -1016,6 +1154,193 @@ export const addonGroups = onRequest({
     }
   } catch (error) {
     console.error('Addon groups endpoint error:', error);
+    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+    response.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Branches endpoint
+export const branches = onRequest({
+  maxInstances: 10,
+  cors: corsOrigins
+}, async (request, response) => {
+  try {
+    // Handle CORS
+    const wasHandled = CorsMiddleware.handleCors(request, response);
+    if (wasHandled) return;
+
+    const controller = new BranchController();
+
+    // Extract and set resource ID from path or query parameters
+    const resourceId = RequestParamsMiddleware.extractAndSetResourceId(request, 'branch', 1);
+
+    if (request.method === 'GET') {
+      if (resourceId) {
+        // GET /branches/{id} - Get single branch
+        await controller.getBranchById(request, response);
+      } else {
+        // GET /branches?place_id=xxx&status=active&city=xxx&state=xxx&allow_online_orders=true&search=xxx
+        await controller.queryBranches(request, response);
+      }
+    }
+    else if (request.method === 'POST') {
+      // POST /branches - Create new branch
+      await controller.createBranch(request, response);
+    }
+    else if (request.method === 'PUT') {
+      // PUT /branches/{id} - Update branch
+      // Allow ID from path or body (controller will handle validation)
+      await controller.updateBranch(request, response);
+    }
+    else if (request.method === 'DELETE') {
+      if (resourceId) {
+        // DELETE /branches/{id} - Delete branch
+        await controller.deleteBranch(request, response);
+      } else {
+        response.status(400).json({ success: false, message: 'Branch ID required' });
+      }
+    }
+    else {
+      response.status(405).json({ success: false, message: 'Method not allowed' });
+    }
+  } catch (error) {
+    console.error('Branches endpoint error:', error);
+    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+    response.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Inventory endpoints
+export const inventory = onRequest({
+  maxInstances: 10,
+  cors: corsOrigins
+}, async (request, response) => {
+  try {
+    // Handle CORS
+    const wasHandled = CorsMiddleware.handleCors(request, response);
+    if (wasHandled) return;
+
+    const controller = new InventoryController();
+
+    // Extract path and parse it
+    const path = request.path || request.url?.split('?')[0] || '';
+    const pathParts = path.split('/').filter(p => p);
+    
+    // Extract ID from path: /inventory/{id} or /inventory/adjust
+    const resourceId = pathParts[1]; // ID is second segment (after 'inventory')
+    const action = pathParts[1]; // Check if it's an action like 'adjust'
+
+    if (request.method === 'GET') {
+      if (resourceId && resourceId !== 'adjust') {
+        // GET /inventory/{id} - Get single inventory item
+        await controller.getInventoryById(request, response);
+      } else if (request.query.low_stock === 'true' || request.query.lowStock === 'true') {
+        // GET /inventory?place_id=xxx&low_stock=true - Get low stock items
+        await controller.getLowStockItems(request, response);
+      } else if (request.query.place_id || request.query.placeId) {
+        // GET /inventory?place_id=xxx - Get inventory by place
+        await controller.getInventoryByPlaceId(request, response);
+      } else {
+        // GET /inventory?place_id=xxx&branch_id=xxx&ingredient_name=xxx&unit=xxx&low_stock=true&search=xxx - Query inventory
+        await controller.queryInventory(request, response);
+      }
+    }
+    else if (request.method === 'POST') {
+      if (action === 'adjust') {
+        // POST /inventory/adjust - Adjust inventory
+        await controller.adjustInventory(request, response);
+      } else {
+        // POST /inventory - Create new inventory item
+        await controller.createInventory(request, response);
+      }
+    }
+    else if (request.method === 'PUT') {
+      if (resourceId && resourceId !== 'adjust') {
+        // PUT /inventory/{id} - Update inventory
+        await controller.updateInventory(request, response);
+      } else {
+        response.status(400).json({ success: false, message: 'Inventory ID required' });
+      }
+    }
+    else if (request.method === 'DELETE') {
+      if (resourceId && resourceId !== 'adjust') {
+        // DELETE /inventory/{id} - Delete inventory
+        await controller.deleteInventory(request, response);
+      } else {
+        response.status(400).json({ success: false, message: 'Inventory ID required' });
+      }
+    }
+    else {
+      response.status(405).json({ success: false, message: 'Method not allowed' });
+    }
+  } catch (error) {
+    console.error('Inventory endpoint error:', error);
+    CorsMiddleware.setCorsHeaders(response, request.headers.origin);
+    response.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Tables endpoint
+export const tables = onRequest({
+  maxInstances: 10,
+  cors: corsOrigins
+}, async (request, response) => {
+  try {
+    // Handle CORS
+    const wasHandled = CorsMiddleware.handleCors(request, response);
+    if (wasHandled) return;
+
+    const controller = new TableController();
+
+    // Extract and set resource ID from path or query parameters
+    const resourceId = RequestParamsMiddleware.extractAndSetResourceId(request, 'table', 1);
+
+    if (request.method === 'GET') {
+      if (resourceId) {
+        // GET /tables/{id} - Get single table
+        await controller.getTableById(request, response);
+      } else {
+        // GET /tables?place_id=xxx&branch_id=xxx&status=xxx&location=xxx&is_active=true&search=xxx
+        await controller.queryTables(request, response);
+      }
+    }
+    else if (request.method === 'POST') {
+      // POST /tables - Create new table
+      await controller.createTable(request, response);
+    }
+    else if (request.method === 'PUT') {
+      if (resourceId) {
+        // PUT /tables/{id} - Update table
+        await controller.updateTable(request, response);
+      } else {
+        response.status(400).json({ success: false, message: 'Table ID required' });
+      }
+    }
+    else if (request.method === 'DELETE') {
+      if (resourceId) {
+        // DELETE /tables/{id} - Delete table
+        await controller.deleteTable(request, response);
+      } else {
+        response.status(400).json({ success: false, message: 'Table ID required' });
+      }
+    }
+    else {
+      response.status(405).json({ success: false, message: 'Method not allowed' });
+    }
+  } catch (error) {
+    console.error('Tables endpoint error:', error);
     CorsMiddleware.setCorsHeaders(response, request.headers.origin);
     response.status(500).json({
       success: false,

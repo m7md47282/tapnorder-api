@@ -55,25 +55,34 @@ export class PlaceController {
 
   /**
    * Update an existing place
-   * PUT /place?id={id}
+   * PUT /place/{id} or PUT /place?id={id} or PUT /place with id in body
    */
   async updatePlace(req: Request, res: Response): Promise<void> {
     try {
-      const placeId = req.query.id as string;
-      const updateData = req.body;
+      // Try multiple sources for place ID (in order of preference):
+      // 1. Path parameter (req.params[0] - set by middleware)
+      // 2. Query parameter (req.query.id)
+      // 3. Request body (req.body.id)
+      const placeId = (req.params?.[0] as string) || 
+                      (req.query.id as string) || 
+                      (req.body?.id as string);
       
       if(!placeId) {
         res.status(400).json({
           success: false,
           message: 'Place ID is required',
-          errors: ['Place ID must be provided as query parameter']
+          errors: ['Place ID must be provided in path, query parameter, or request body']
         });
         return;
       }
       
+      // Extract update data from body, excluding the id field
+      const bodyData = { ...req.body };
+      delete bodyData.id;
+      
       const command: UpdatePlaceCommand = {
         id: placeId,
-        ...updateData
+        ...bodyData
       };
 
       const place = await this.placeService.updatePlace(command);
@@ -95,16 +104,21 @@ export class PlaceController {
 
   /**
    * Delete a place
-   * DELETE /place?id={id}
+   * DELETE /place/{id} or DELETE /place?id={id}
    */
   async deletePlace(req: Request, res: Response): Promise<void> {
     try {
-      const placeId = req.query.id as string;
+      // Try multiple sources for place ID (in order of preference):
+      // 1. Path parameter (req.params[0] - set by middleware)
+      // 2. Query parameter (req.query.id)
+      const placeId = (req.params?.[0] as string) || 
+                      (req.query.id as string);
+      
       if(!placeId) {
         res.status(400).json({
           success: false,
           message: 'Place ID is required',
-          errors: ['Place ID must be provided as query parameter']
+          errors: ['Place ID must be provided in path or query parameter']
         });
         return;
       }
@@ -126,17 +140,21 @@ export class PlaceController {
 
   /**
    * Get a place by ID
-   * GET /place?id={id}
+   * GET /place/{id} or GET /place?id={id}
    */
   async getPlaceById(req: Request, res: Response): Promise<void> {
     try {
-      const placeId = req.query.id as string;
+      // Try multiple sources for place ID (in order of preference):
+      // 1. Path parameter (req.params[0] - set by middleware)
+      // 2. Query parameter (req.query.id)
+      const placeId = (req.params?.[0] as string) || 
+                      (req.query.id as string);
       
       if(!placeId) {
         res.status(400).json({
           success: false,
           message: 'Place ID is required',
-          errors: ['Place ID must be provided as query parameter']
+          errors: ['Place ID must be provided in path or query parameter']
         });
         return;
       }

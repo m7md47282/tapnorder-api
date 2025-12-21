@@ -1,0 +1,314 @@
+/* Hero component styles */
+.container {
+  max-width: 1200px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 641px) {
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Animation keyframes */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+/* Animation classes */
+.animate-slide-up {
+  animation: slide-up 0.8s ease-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Explode animations */
+@keyframes explode-tl {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-pizza, 0px)), calc(-50% + var(--mouse-y-pizza, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-tr {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-burger, 0px)), calc(-50% + var(--mouse-y-burger, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-br {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-coffee, 0px)), calc(-50% + var(--mouse-y-coffee, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-bl {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-sushi, 0px)), calc(-50% + var(--mouse-y-sushi, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-tc {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-icecream, 0px)), calc(-50% + var(--mouse-y-icecream, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-lc {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-taco, 0px)), calc(-50% + var(--mouse-y-taco, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-rc {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-donut, 0px)), calc(-50% + var(--mouse-y-donut, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-bc {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-salad, 0px)), calc(-50% + var(--mouse-y-salad, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-tl-corner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-cake, 0px)), calc(-50% + var(--mouse-y-cake, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-tr-corner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-hotdog, 0px)), calc(-50% + var(--mouse-y-hotdog, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-bl-corner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-fries, 0px)), calc(-50% + var(--mouse-y-fries, 0px))) scale(1);
+  }
+}
+
+@keyframes explode-br-corner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--mouse-x-coffeecup, 0px)), calc(-50% + var(--mouse-y-coffeecup, 0px))) scale(1);
+  }
+}
+
+/* Explode animation classes */
+.animate-explode-tl {
+  animation: explode-tl 3s ease-out forwards;
+}
+
+.animate-explode-tr {
+  animation: explode-tr 3s ease-out forwards;
+}
+
+.animate-explode-br {
+  animation: explode-br 3s ease-out forwards;
+}
+
+.animate-explode-bl {
+  animation: explode-bl 3s ease-out forwards;
+}
+
+.animate-explode-tc {
+  animation: explode-tc 3s ease-out forwards;
+}
+
+.animate-explode-lc {
+  animation: explode-lc 3s ease-out forwards;
+}
+
+.animate-explode-rc {
+  animation: explode-rc 3s ease-out forwards;
+}
+
+.animate-explode-bc {
+  animation: explode-bc 3s ease-out forwards;
+}
+
+.animate-explode-tl-corner {
+  animation: explode-tl-corner 3s ease-out forwards;
+}
+
+.animate-explode-tr-corner {
+  animation: explode-tr-corner 3s ease-out forwards;
+}
+
+.animate-explode-bl-corner {
+  animation: explode-bl-corner 3s ease-out forwards;
+}
+
+.animate-explode-br-corner {
+  animation: explode-br-corner 3s ease-out forwards;
+}

@@ -185,16 +185,28 @@ export abstract class BaseRepository<T extends BaseModel> implements IBaseReposi
   }
 
   /**
-   * Remove undefined values from an object
+   * Remove undefined values from an object recursively
    * Firestore doesn't allow undefined values in documents
+   * This method recursively removes undefined values from nested objects and arrays
    */
-  protected removeUndefinedValues<T extends Record<string, any>>(obj: T): Partial<T> {
-    const cleaned: Partial<T> = {};
-    for (const key in obj) {
-      if (obj[key] !== undefined) {
-        cleaned[key] = obj[key];
-      }
+  protected removeUndefinedValues<T>(data: T): Partial<T> {
+    if (data === null || typeof data !== 'object' || data instanceof Date) {
+      return data as Partial<T>;
     }
-    return cleaned;
+
+    if (Array.isArray(data)) {
+      return data
+        .map(item => this.removeUndefinedValues(item))
+        .filter(item => item !== undefined) as unknown as Partial<T>;
+    }
+
+    const result: Record<string, unknown> = {};
+    Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
+      if (value === undefined) {
+        return;
+      }
+      result[key] = this.removeUndefinedValues(value);
+    });
+    return result as Partial<T>;
   }
 }

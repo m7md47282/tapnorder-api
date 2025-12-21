@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { OrderService } from '../services/order.service';
 import { CreateOrderCommand, OrderQuery } from '../entities/order.entity';
+import { AuthenticatedRequest } from '../shared/middleware/auth.middleware';
 
 /**
  * Order Controller - Presentation Layer
@@ -21,6 +22,7 @@ export class OrderController {
    */
   createOrder = async (req: Request, res: Response): Promise<void> => {
     try {
+      const authenticatedReq = req as AuthenticatedRequest;
       const {
         placeId,
         customer,
@@ -28,7 +30,9 @@ export class OrderController {
         type,
         payment,
         source = 'pos',
-        lastUpdatedBy
+        lastUpdatedBy,
+        tableId,
+        notes
       } = req.body;
 
       // Validate required fields
@@ -88,11 +92,13 @@ export class OrderController {
         type,
         payment,
         source,
-        lastUpdatedBy
+        lastUpdatedBy,
+        tableId,
+        notes
       };
 
       // Create order
-      const order = await this.orderService.createOrder(command);
+      const order = await this.orderService.createOrder(command, authenticatedReq.authenticatedUser && { user: authenticatedReq.authenticatedUser.user });
 
       res.status(201).json({
         success: true,
@@ -116,8 +122,10 @@ export class OrderController {
    */
   getOrders = async (req: Request, res: Response): Promise<void> => {
     try {
+      const authenticatedReq = req as AuthenticatedRequest;
       const {
         placeId,
+        branchId,
         status,
         type,
         customerId,
@@ -139,6 +147,7 @@ export class OrderController {
       // Build query
       const query: OrderQuery = {
         placeId: placeId as string,
+        branchId: branchId as string,
         status: status as any,
         type: type as any,
         customerId: customerId as string,
@@ -149,7 +158,11 @@ export class OrderController {
       };
 
       // Get orders
-      const orders = await this.orderService.getOrdersByPlaceId(placeId as string, query);
+      const orders = await this.orderService.getOrdersByPlaceId(
+        placeId as string,
+        query,
+        authenticatedReq.authenticatedUser && { user: authenticatedReq.authenticatedUser.user }
+      );
 
       res.status(200).json({
         success: true,
@@ -216,6 +229,7 @@ export class OrderController {
    */
   getOrderByNumber = async (req: Request, res: Response): Promise<void> => {
     try {
+      const authenticatedReq = req as AuthenticatedRequest;
       const orderNumber = req.params[0];
       const { placeId } = req.query;
 
@@ -235,7 +249,11 @@ export class OrderController {
         return;
       }
 
-      const order = await this.orderService.getOrderByOrderNumber(placeId as string, orderNumber);
+      const order = await this.orderService.getOrderByOrderNumber(
+        placeId as string,
+        orderNumber,
+        authenticatedReq.authenticatedUser && { user: authenticatedReq.authenticatedUser.user }
+      );
 
       if (!order) {
         res.status(404).json({

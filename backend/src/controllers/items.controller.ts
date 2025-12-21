@@ -39,15 +39,18 @@ export class ItemsController {
       const command: CreateItemCommand = {
         name: req.body.name,
         description: req.body.description,
-        price: req.body.price,
+        price: req.body.price, // Optional: if not provided and recipe exists, will use calculatedCost * 2
         // Support both 'category' and 'categoryId' for backward compatibility
         categoryId: req.body.categoryId !== undefined ? req.body.categoryId : req.body.category,
         imageUrl: req.body.imageUrl,
         isAvailable: req.body.isAvailable,
         preparationTime: req.body.preparationTime,
-        ingredients: req.body.ingredients,
+        recipe: req.body.recipe, // Recipe with ingredient quantities (for cost calculation)
+        ingredients: req.body.ingredients, // Legacy: kept for backward compatibility
         specs: req.body.specs,
         menuId: req.body.menuId,
+        placeId: req.body.placeId, // Will get menu by placeId if menuId not provided
+        branchId: req.body.branchId, // Each branch can have its own items
         addonGroups: req.body.addonGroups,
         addonGroupIds: req.body.addonGroupIds
       };
@@ -101,8 +104,10 @@ export class ItemsController {
         imageUrl: req.body.imageUrl,
         isAvailable: req.body.isAvailable,
         preparationTime: req.body.preparationTime,
-        ingredients: req.body.ingredients,
+        recipe: req.body.recipe, // Recipe with ingredient quantities (will recalculate cost)
+        ingredients: req.body.ingredients, // Legacy: kept for backward compatibility
         specs: req.body.specs,
+        branchId: req.body.branchId,
         addonGroups: req.body.addonGroups,
         addonGroupIds: req.body.addonGroupIds
       };
@@ -331,6 +336,8 @@ export class ItemsController {
       // Support both camelCase (preferred) and snake_case (backward compatibility)
       const query: ItemQuery = {
         menuId: (req.query.menuId || req.query.menu_id) as string,
+        placeId: (req.query.placeId || req.query.place_id) as string,
+        branchId: (req.query.branchId || req.query.branch_id) as string,
         categoryId: (req.query.categoryId || req.query.category_id) as string,
         isAvailable: req.query.isAvailable === 'true' || req.query.is_available === 'true' ? true : 
                     req.query.isAvailable === 'false' || req.query.is_available === 'false' ? false : undefined,

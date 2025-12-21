@@ -2,9 +2,13 @@ import { Item, CreateItemCommand, UpdateItemCommand, ItemQuery } from '../entiti
 import { IMenuService } from './interfaces/menu.service.interface';
 import { MenuService } from './menu.service';
 import { ItemRepository, IItemRepository } from '../repositories/item/item.repository';
-import { Menu } from '../repositories/menu/types';
 import { IAddonGroupService } from './addon-group.service';
 import { AddonGroupService } from './addon-group.service';
+import { IBranchService } from './interfaces/branch.service.interface';
+import { BranchService } from './branch.service';
+import { ItemCostCalculatorService } from './item-cost-calculator.service';
+import { IInventoryService } from './interfaces/inventory.service.interface';
+import { InventoryService } from './inventory.service';
 
 export interface IItemService {
   createItem(command: CreateItemCommand): Promise<Item>;
@@ -16,42 +20,100 @@ export interface IItemService {
   getAvailableItems(menuId?: string): Promise<Item[]>;
   searchItems(menuId: string | undefined, searchTerm: string): Promise<Item[]>;
   queryItems(query: ItemQuery): Promise<Item[]>;
+  recalculateItem(itemId: string): Promise<Item>;
+  recalculateItemsUsingInventory(inventoryId: string): Promise<void>;
 }
 
 export class ItemService implements IItemService {
   private readonly menuService: IMenuService;
   private readonly itemRepository: IItemRepository;
   private readonly addonGroupService: IAddonGroupService;
+  private readonly branchService: IBranchService;
+  private readonly inventoryService: IInventoryService;
+  private readonly costCalculator: ItemCostCalculatorService;
 
   constructor(
     menuService?: IMenuService, 
     itemRepository?: IItemRepository,
-    addonGroupService?: IAddonGroupService
+    addonGroupService?: IAddonGroupService,
+    branchService?: IBranchService,
+    inventoryService?: IInventoryService
   ) {
     this.menuService = menuService ?? new MenuService();
     this.itemRepository = itemRepository ?? new ItemRepository();
     this.addonGroupService = addonGroupService ?? new AddonGroupService();
+    this.branchService = branchService ?? new BranchService();
+    this.inventoryService = inventoryService ?? new InventoryService();
+    this.costCalculator = new ItemCostCalculatorService(this.inventoryService);
   }
 
   async createItem(command: CreateItemCommand): Promise<Item> {
     // Business validation
     this.validateCreateCommand(command);
 
-    // Check if menu exists (only if menuId is provided)
-    if (command.menuId) {
-      const menu: Menu | null = await this.menuService.getMenuById(command.menuId);
+    // Handle placeId: Get menu by placeId if placeId is provided and menuId is not
+    let effectiveMenuId = command.menuId;
+    let effectivePlaceId = command.placeId;
+
+    if (command.placeId && !command.menuId) {
+      const menu = await this.menuService.getMenuByPlaceId(command.placeId);
+      if (!menu) {
+        // Menu not found - allow creating item without menuId (menuId is optional)
+        effectiveMenuId = undefined;
+        effectivePlaceId = command.placeId;
+      } else {
+        effectiveMenuId = menu.id;
+        effectivePlaceId = menu.placeId;
+      }
+    } else if (command.menuId && command.placeId) {
+      // If both are provided, validate they match
+      const menu = await this.menuService.getMenuById(command.menuId);
       if (!menu) {
         throw new Error('Menu not found');
       }
-      
-      // Check if item with same name already exists in menu
-      const existingItems = await this.itemRepository.getByMenuId(command.menuId);
-      const duplicateItem = existingItems.find(item => 
-        item.name.toLowerCase() === command.name.toLowerCase()
-      );
+      if (menu.placeId !== command.placeId) {
+        throw new Error(`Menu does not belong to place ID: ${command.placeId}`);
+      }
+      effectivePlaceId = menu.placeId;
+    } else if (command.menuId) {
+      // Get placeId from menu
+      const menu = await this.menuService.getMenuById(command.menuId);
+      if (!menu) {
+        throw new Error('Menu not found');
+      }
+      effectivePlaceId = menu.placeId;
+    }
 
-      if (duplicateItem) {
-        throw new Error(`Item with name "${command.name}" already exists in this menu`);
+    // Validate branch belongs to place (if both are provided)
+    if (command.branchId && effectivePlaceId) {
+      const isValid = await this.branchService.validateBranchPlace(command.branchId, effectivePlaceId);
+      if (!isValid) {
+        throw new Error(`Branch ID ${command.branchId} does not belong to place ID ${effectivePlaceId}`);
+      }
+    }
+
+    // Check if menu exists (only if menuId is provided)
+    if (effectiveMenuId) {
+      // Check for duplicate items in the same branch (if branchId is provided)
+      // or in the same menu (if no branchId)
+      if (command.branchId) {
+        const existingItems = await this.itemRepository.getByMenuIdAndBranchId(effectiveMenuId, command.branchId);
+        const duplicateItem = existingItems.find(item => 
+          item.name.toLowerCase() === command.name.toLowerCase()
+        );
+
+        if (duplicateItem) {
+          throw new Error(`Item with name "${command.name}" already exists in this branch`);
+        }
+      } else {
+        const existingItems = await this.itemRepository.getByMenuId(effectiveMenuId);
+        const duplicateItem = existingItems.find(item => 
+          item.name.toLowerCase() === command.name.toLowerCase()
+        );
+
+        if (duplicateItem) {
+          throw new Error(`Item with name "${command.name}" already exists in this menu`);
+        }
       }
     }
 
@@ -65,18 +127,50 @@ export class ItemService implements IItemService {
       this.validateItemAddonGroups(command.addonGroups);
     }
 
+    // Calculate cost and available units if recipe is provided
+    let calculatedCost: number | undefined;
+    let availableUnits: number | undefined;
+    
+    if (command.recipe && command.recipe.length > 0) {
+      try {
+        const costCalculation = await this.costCalculator.calculateItemCost(
+          command.recipe,
+          effectivePlaceId!,
+          command.branchId
+        );
+        calculatedCost = costCalculation.calculatedCost;
+        availableUnits = costCalculation.availableUnits;
+      } catch (error) {
+        throw new Error(`Failed to calculate item cost: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    // Determine selling price: use provided price, or calculated cost with default markup (2x)
+    const sellingPrice = command.price ?? (calculatedCost ? calculatedCost * 2 : 0);
+    
+    if (sellingPrice <= 0) {
+      throw new Error('Item price must be greater than 0. Provide either price or recipe for cost calculation.');
+    }
+
     // Create new item - filter out undefined values
     const itemData: Omit<Item, 'id' | 'createdAt' | 'updatedAt'> = {
       name: command.name,
       description: command.description,
-      price: command.price,
-      isAvailable: command.isAvailable ?? true,
+      price: sellingPrice,
+      ...(calculatedCost !== undefined && { calculatedCost }),
+      ...(availableUnits !== undefined && { availableUnits }),
+      isAvailable: command.isAvailable ?? (availableUnits !== undefined ? availableUnits > 0 : true),
       categoryId: command.categoryId,
       imageUrl: command.imageUrl,
       preparationTime: command.preparationTime,
-      ingredients: command.ingredients,
+      recipe: command.recipe,
+      ingredients: command.ingredients, // Legacy support
       specs: command.specs,
-      ...(command.menuId && { menuId: command.menuId }),
+      ...(effectiveMenuId && { menuId: effectiveMenuId }),
+      // Always include placeId if it was determined (from command or menu lookup)
+      ...(effectivePlaceId !== undefined && { placeId: effectivePlaceId }),
+      // Always include branchId if provided in command (including null)
+      ...(command.branchId !== undefined && { branchId: command.branchId }),
       ...(command.addonGroups && { addonGroups: command.addonGroups }),
       ...(command.addonGroupIds && { addonGroupIds: command.addonGroupIds })
     };
@@ -124,17 +218,51 @@ export class ItemService implements IItemService {
       this.validateItemAddonGroups(command.addonGroups);
     }
 
+    // Recalculate cost and available units if recipe is being updated
+    let calculatedCost: number | undefined;
+    let availableUnits: number | undefined;
+    const recipeToUse = command.recipe !== undefined ? command.recipe : existingItem.recipe;
+    
+    if (recipeToUse && recipeToUse.length > 0) {
+      try {
+        // Get placeId from menu
+        let placeId: string | undefined;
+        if (existingItem.menuId) {
+          const menu = await this.menuService.getMenuById(existingItem.menuId);
+          placeId = menu?.placeId;
+        }
+        
+        if (placeId) {
+          const costCalculation = await this.costCalculator.calculateItemCost(
+            recipeToUse,
+            placeId,
+            command.branchId ?? existingItem.branchId
+          );
+          calculatedCost = costCalculation.calculatedCost;
+          availableUnits = costCalculation.availableUnits;
+        }
+      } catch (error) {
+        // Log error but don't fail update if recipe calculation fails
+        console.error('Failed to recalculate item cost:', error);
+      }
+    }
+
     // Update item
     const updateData: Partial<Omit<Item, 'id' | 'createdAt' | 'updatedAt' | 'menuId'>> = {
       ...(command.name !== undefined && { name: command.name }),
       ...(command.description !== undefined && { description: command.description }),
       ...(command.price !== undefined && { price: command.price }),
+      ...(calculatedCost !== undefined && { calculatedCost }),
+      ...(availableUnits !== undefined && { availableUnits }),
       ...(command.categoryId !== undefined && { categoryId: command.categoryId }),
       ...(command.isAvailable !== undefined && { isAvailable: command.isAvailable }),
+      ...(availableUnits !== undefined && { isAvailable: availableUnits > 0 && (command.isAvailable ?? existingItem.isAvailable) }),
       ...(command.imageUrl !== undefined && { imageUrl: command.imageUrl }),
       ...(command.preparationTime !== undefined && { preparationTime: command.preparationTime }),
+      ...(command.recipe !== undefined && { recipe: command.recipe }),
       ...(command.ingredients !== undefined && { ingredients: command.ingredients }),
       ...(command.specs !== undefined && { specs: command.specs }),
+      ...(command.branchId !== undefined && { branchId: command.branchId }),
       ...(command.addonGroups !== undefined && { addonGroups: command.addonGroups }),
       ...(command.addonGroupIds !== undefined && { addonGroupIds: command.addonGroupIds })
     };
@@ -214,30 +342,162 @@ export class ItemService implements IItemService {
     );
   }
 
+  /**
+   * Recalculate cost and available units for an item
+   * Called when inventory changes
+   */
+  async recalculateItem(itemId: string): Promise<Item> {
+    const item = await this.itemRepository.getById(itemId);
+    if (!item) {
+      throw new Error('Item not found');
+    }
+
+    if (!item.recipe || item.recipe.length === 0) {
+      return item; // No recipe, nothing to recalculate
+    }
+
+    // Get placeId from menu
+    let placeId: string | undefined;
+    if (item.menuId) {
+      const menu = await this.menuService.getMenuById(item.menuId);
+      placeId = menu?.placeId;
+    }
+
+    if (!placeId) {
+      return item; // Can't recalculate without placeId
+    }
+
+    try {
+      const costCalculation = await this.costCalculator.calculateItemCost(
+        item.recipe,
+        placeId,
+        item.branchId
+      );
+
+      const updateData: Partial<Item> = {
+        calculatedCost: costCalculation.calculatedCost,
+        availableUnits: costCalculation.availableUnits,
+        isAvailable: costCalculation.availableUnits > 0 && item.isAvailable
+      };
+
+      await this.itemRepository.update(itemId, updateData);
+      const updatedItem = await this.itemRepository.getById(itemId);
+      
+      if (!updatedItem) {
+        throw new Error('Failed to retrieve updated item');
+      }
+
+      return updatedItem;
+    } catch (error) {
+      console.error(`Failed to recalculate item ${itemId}:`, error);
+      return item; // Return original item if recalculation fails
+    }
+  }
+
+  /**
+   * Recalculate all items that use a specific inventory item
+   * Called when inventory is updated
+   */
+  async recalculateItemsUsingInventory(inventoryId: string): Promise<void> {
+    // Get all items and filter those that use this inventory
+    const allItems = await this.itemRepository.getAll();
+    const affectedItems = allItems.filter(item => 
+      item.recipe?.some(ingredient => ingredient.inventoryId === inventoryId)
+    );
+
+    // Recalculate each affected item
+    await Promise.all(
+      affectedItems.map(item => this.recalculateItem(item.id).catch(err => {
+        console.error(`Failed to recalculate item ${item.id}:`, err);
+      }))
+    );
+  }
+
   async queryItems(query: ItemQuery): Promise<Item[]> {
     if (query.menuId && !query.menuId.trim()) {
       throw new Error('Menu ID cannot be empty');
     }
 
-    // Handle search
-    if (query.search) {
-      return this.searchItems(query.menuId, query.search);
+    // Handle placeId: Get menu by placeId first, then use menuId for filtering
+    let effectiveMenuId = query.menuId;
+    if (query.placeId) {
+      const menu = await this.menuService.getMenuByPlaceId(query.placeId);
+      if (menu) {
+        effectiveMenuId = menu.id;
+      }
+      // If no menu found, we'll query items directly by placeId
     }
 
+    // Build base filters
+    let items: Item[] = [];
+
+    // If we have menuId (either from query or from placeId), start with menu items
+    if (effectiveMenuId) {
+      // Handle branchId filter with menuId
+      if (query.branchId) {
+        // Get both branch-specific items AND shared items (items without branchId)
+        const branchSpecificItems = await this.itemRepository.getByMenuIdAndBranchId(effectiveMenuId, query.branchId);
+        const sharedItems = await this.itemRepository.getSharedItemsByMenuId(effectiveMenuId);
+        
+        // Combine both sets and remove duplicates by ID
+        const itemMap = new Map<string, Item>();
+        [...branchSpecificItems, ...sharedItems].forEach(item => {
+          itemMap.set(item.id, item);
+        });
+        items = Array.from(itemMap.values());
+      } else {
+        // No branchId filter - get all items for the menu (both shared and branch-specific)
+        items = await this.itemRepository.getByMenuId(effectiveMenuId);
+      }
+    } else if (query.placeId) {
+      // No menu found - query items directly by placeId
+      if (query.branchId) {
+        // Get both branch-specific items AND shared items (items without branchId)
+        const branchSpecificItems = await this.itemRepository.getByPlaceIdAndBranchId(query.placeId, query.branchId);
+        const sharedItems = await this.itemRepository.getSharedItemsByPlaceId(query.placeId);
+        
+        // Combine both sets and remove duplicates by ID
+        const itemMap = new Map<string, Item>();
+        [...branchSpecificItems, ...sharedItems].forEach(item => {
+          itemMap.set(item.id, item);
+        });
+        items = Array.from(itemMap.values());
+      } else {
+        // No branchId filter - get all items for the place (both shared and branch-specific)
+        items = await this.itemRepository.getByPlaceId(query.placeId);
+      }
+    } else if (query.branchId) {
+      // If only branchId is provided (no menuId/placeId), filter by branchId only
+      items = await this.itemRepository.getByBranchId(query.branchId);
+    } else {
+      // No menuId or branchId, get all items
+      items = await this.itemRepository.getAll();
+    }
+
+    // Apply additional filters
     // Handle category filter
     if (query.categoryId) {
-      return this.getItemsByCategoryId(query.menuId, query.categoryId);
+      items = items.filter(item => item.categoryId === query.categoryId);
     }
 
     // Handle availability filter
     if (query.isAvailable !== undefined) {
-      return query.isAvailable 
-        ? this.getAvailableItems(query.menuId)
-        : this.getItemsByMenuId(query.menuId);
+      items = items.filter(item => item.isAvailable === query.isAvailable);
     }
 
-    // If no specific filters, return items by menuId or all items
-    return this.getItemsByMenuId(query.menuId);
+    // Handle search
+    if (query.search) {
+      const searchLower = query.search.toLowerCase();
+      items = items.filter(item => 
+        item.name.toLowerCase().includes(searchLower) ||
+        item.description?.toLowerCase().includes(searchLower) ||
+        item.ingredients?.some(ingredient => 
+          ingredient.toLowerCase().includes(searchLower)
+        )
+      );
+    }
+
+    return items;
   }
 
   // No conversion needed: repository returns Item shape directly
@@ -249,8 +509,27 @@ export class ItemService implements IItemService {
     if (!command.categoryId || command.categoryId.trim() === '') {
       throw new Error('Item category ID is required');
     }
-    if (command.price === undefined || command.price < 0) {
+    // Price is now optional if recipe is provided (will be calculated)
+    // But if provided, must be valid
+    if (command.price !== undefined && command.price < 0) {
       throw new Error('Item price must be a non-negative number');
+    }
+    // Validate recipe if provided
+    if (command.recipe && command.recipe.length > 0) {
+      command.recipe.forEach((ingredient, index) => {
+        if (!ingredient.inventoryId || ingredient.inventoryId.trim() === '') {
+          throw new Error(`Recipe ingredient at index ${index} must have inventoryId`);
+        }
+        if (!ingredient.ingredientName || ingredient.ingredientName.trim() === '') {
+          throw new Error(`Recipe ingredient at index ${index} must have ingredientName`);
+        }
+        if (ingredient.quantity <= 0) {
+          throw new Error(`Recipe ingredient at index ${index} must have quantity greater than 0`);
+        }
+        if (!ingredient.unit) {
+          throw new Error(`Recipe ingredient at index ${index} must have unit`);
+        }
+      });
     }
     // menuId is now optional, so we don't validate it
     if (command.preparationTime !== undefined && command.preparationTime < 0) {
@@ -273,6 +552,23 @@ export class ItemService implements IItemService {
     }
     if (command.price !== undefined && command.price < 0) {
       throw new Error('Item price must be a non-negative number');
+    }
+    // Validate recipe if provided
+    if (command.recipe && command.recipe.length > 0) {
+      command.recipe.forEach((ingredient, index) => {
+        if (!ingredient.inventoryId || ingredient.inventoryId.trim() === '') {
+          throw new Error(`Recipe ingredient at index ${index} must have inventoryId`);
+        }
+        if (!ingredient.ingredientName || ingredient.ingredientName.trim() === '') {
+          throw new Error(`Recipe ingredient at index ${index} must have ingredientName`);
+        }
+        if (ingredient.quantity <= 0) {
+          throw new Error(`Recipe ingredient at index ${index} must have quantity greater than 0`);
+        }
+        if (!ingredient.unit) {
+          throw new Error(`Recipe ingredient at index ${index} must have unit`);
+        }
+      });
     }
     if (command.preparationTime !== undefined && command.preparationTime < 0) {
       throw new Error('Preparation time must be a non-negative number');

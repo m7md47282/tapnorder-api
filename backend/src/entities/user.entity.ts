@@ -51,7 +51,8 @@ export interface User extends BaseModel {
   customClaims?: Record<string, unknown>;
   preferences?: Record<string, unknown>;
   metadata?: UserMetadata;
-  places?: string[];
+  placeId?: string | null;  // Place ID - null for SUPER_ADMIN (can access all places)
+  branchId?: string | null;  // Branch ID - null means shared across all branches of the place
 }
 
 export interface LoginCommand {
@@ -68,7 +69,8 @@ export interface SignupCommand extends LoginCommand {
   roleId?: number;
   roleKey?: keyof typeof UserRole | string;
   preferences?: Record<string, unknown>;
-  places?: string[];
+  placeId?: string | null;  // Place ID - null for SUPER_ADMIN
+  branchId?: string | null; // Branch ID - null means shared across all branches
 }
 
 export interface IdentityProfileSnapshot {

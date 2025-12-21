@@ -47,10 +47,15 @@ export interface Order {
   id: string;
   orderNumber: string; // Human-readable order number (e.g., "ORD-001", "ORD-002")
   placeId: string;
+  branchId?: string; // Branch ID for filtering orders by branch
   customer: OrderCustomer;
   items: OrderItem[];
   status: OrderStatus;
   type: OrderType;
+  
+  // Table information (for dine-in orders)
+  tableId?: string; // Table ID for dine-in orders
+  notes?: string; // Additional notes (e.g., "Table: 1")
   
   // Pricing
   subtotal: number;
@@ -80,6 +85,8 @@ export interface CreateOrderCommand {
   payment: Omit<OrderPayment, 'status' | 'processedAt'>;
   source: 'pos' | 'online' | 'mobile_app' | 'phone';
   lastUpdatedBy: string;
+  tableId?: string; // Table ID for dine-in orders
+  notes?: string; // Additional notes
 }
 
 export interface UpdateOrderCommand {
@@ -91,6 +98,7 @@ export interface UpdateOrderCommand {
 // Query interfaces
 export interface OrderQuery {
   placeId?: string;
+  branchId?: string;
   status?: OrderStatus;
   type?: OrderType;
   customerId?: string;

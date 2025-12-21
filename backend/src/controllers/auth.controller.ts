@@ -37,7 +37,8 @@ export class AuthController {
         roleId,
         roleKey,
         preferences: this.extractPreferences(req),
-        places: this.extractPlaces(req),
+        placeId: this.extractPlaceId(req),
+        branchId: this.extractBranchId(req),
         ipAddress: this.getRequestIp(req)
       };
 
@@ -155,14 +156,24 @@ export class AuthController {
     return trimmed.length > 0 ? trimmed : undefined;
   }
 
-  private extractPlaces(req: Request): string[] | undefined {
-    if (!Array.isArray(req.body?.places)) {
-      return undefined;
+  private extractPlaceId(req: Request): string | null | undefined {
+    const placeId = req.body?.placeId || req.body?.place_id;
+    if (placeId === undefined) return undefined;
+    if (placeId === null) return null;
+    if (typeof placeId === 'string' && placeId.trim().length > 0) {
+      return placeId.trim();
     }
-    const places = req.body.places
-      .filter((placeId: unknown): placeId is string => typeof placeId === 'string' && placeId.trim().length > 0)
-      .map((placeId: string) => placeId.trim());
-    return places.length > 0 ? places : undefined;
+    return undefined;
+  }
+
+  private extractBranchId(req: Request): string | null | undefined {
+    const branchId = req.body?.branchId || req.body?.branch_id;
+    if (branchId === undefined) return undefined;
+    if (branchId === null) return null;
+    if (typeof branchId === 'string' && branchId.trim().length > 0) {
+      return branchId.trim();
+    }
+    return undefined;
   }
 
   private extractPreferences(req: Request): Record<string, unknown> | undefined {

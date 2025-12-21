@@ -5,6 +5,10 @@ import { QueryFilter } from '../types';
 export interface ICategoryRepository {
   getAll(): Promise<Category[]>;
   getByMenuId(menuId: string): Promise<Category[]>;
+  getByPlaceId(placeId: string): Promise<Category[]>;
+  getByBranchId(branchId: string): Promise<Category[]>;
+  getByMenuIdAndBranchId(menuId: string, branchId: string): Promise<Category[]>;
+  getSharedCategoriesByMenuId(menuId: string): Promise<Category[]>; // Categories with menuId but no branchId (shared across branches)
   getActiveCategories(menuId: string): Promise<Category[]>;
   searchCategories(menuId: string, searchTerm: string): Promise<Category[]>;
   getAllActive(): Promise<Category[]>;
@@ -30,6 +34,38 @@ export class CategoryRepository extends BaseRepository<Category> implements ICat
       { field: 'menuId', operator: '==', value: menuId }
     ];
     return this.query(filters);
+  }
+
+  async getByPlaceId(placeId: string): Promise<Category[]> {
+    const filters: QueryFilter[] = [
+      { field: 'placeId', operator: '==', value: placeId }
+    ];
+    return this.query(filters);
+  }
+
+  async getByBranchId(branchId: string): Promise<Category[]> {
+    const filters: QueryFilter[] = [
+      { field: 'branchId', operator: '==', value: branchId }
+    ];
+    return this.query(filters);
+  }
+
+  async getByMenuIdAndBranchId(menuId: string, branchId: string): Promise<Category[]> {
+    const filters: QueryFilter[] = [
+      { field: 'menuId', operator: '==', value: menuId },
+      { field: 'branchId', operator: '==', value: branchId }
+    ];
+    return this.query(filters);
+  }
+
+  async getSharedCategoriesByMenuId(menuId: string): Promise<Category[]> {
+    // Get categories with menuId but no branchId (shared across all branches)
+    const filters: QueryFilter[] = [
+      { field: 'menuId', operator: '==', value: menuId }
+    ];
+    const allMenuCategories = await this.query(filters);
+    // Filter categories where branchId is null or undefined
+    return allMenuCategories.filter(category => !category.branchId);
   }
 
   async getActiveCategories(menuId: string): Promise<Category[]> {

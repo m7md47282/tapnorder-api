@@ -16,9 +16,18 @@ export interface IOrderService {
   getOrderByOrderNumber(placeId: string, orderNumber: string): Promise<Order | null>;
   
   // Real-time operations for cashier
-  subscribeToOrdersByPlaceId(placeId: string, callback: (orders: Order[]) => void): () => void;
+  subscribeToOrdersByPlaceId(
+    placeId: string, 
+    callback: (orders: Order[]) => void,
+    options?: { branchId?: string; hoursBack?: number }
+  ): () => void;
   subscribeToOrderUpdates(orderId: string, callback: (order: Order | null) => void): () => void;
-  subscribeToOrdersByStatus(placeId: string, statuses: Order['status'][], callback: (orders: Order[]) => void): () => void;
+  subscribeToOrdersByStatus(
+    placeId: string, 
+    statuses: Order['status'][], 
+    callback: (orders: Order[]) => void,
+    options?: { branchId?: string; hoursBack?: number }
+  ): () => void;
   
   // Order status management
   updateOrderStatus(orderId: string, status: Order['status'], updatedBy: string): Promise<void>;

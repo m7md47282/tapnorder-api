@@ -1,0 +1,68 @@
+<section class="py-20 bg-gradient-hero relative overflow-hidden">
+  <!-- Background decorative elements -->
+  <div class="absolute inset-0 opacity-10">
+    <div class="absolute top-10 left-1/4 w-20 h-20 bg-white rounded-full animate-float"></div>
+    <div class="absolute bottom-10 right-1/4 w-16 h-16 bg-white rounded-full animate-float" style="animation-delay: 1s;"></div>
+    <div class="absolute top-1/2 right-10 w-12 h-12 bg-white rounded-full animate-float" style="animation-delay: 2s;"></div>
+  </div>
+
+  <div class="container mx-auto px-6 relative">
+    <div class="max-w-4xl mx-auto text-center">
+      <!-- Social proof -->
+      <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 text-white/90 mb-8">
+        <span class="text-lg">👥</span>
+        <span>Join 1000+ restaurants already using Tap n Order</span>
+      </div>
+
+      <h2 class="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+        Ready to transform your<br />
+        <span class="gradient-text">restaurant experience?</span>
+      </h2>
+      
+      <p class="text-xl text-white/80 mb-12 max-w-2xl mx-auto leading-relaxed">
+        Start serving smarter today. Setup takes less than 2 minutes and your first month is completely free.
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-6 justify-center mb-12">
+        <button 
+          (click)="onStartFreeTrial()"
+          class="group bg-white text-primary hover:bg-white/90 px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 hover:scale-105 shadow-glow"
+        >
+          Start Free Trial
+          <span class="inline-block ml-2 group-hover:translate-x-1 transition-transform">→</span>
+        </button>
+        <button 
+          (click)="onScheduleDemo()"
+          class="bg-white/10 border border-white/30 text-white hover:bg-white hover:text-primary px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300"
+        >
+          Schedule Demo
+        </button>
+      </div>
+
+      <!-- Trust indicators -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
+        <div class="text-center">
+          <div class="flex items-center justify-center gap-1 mb-2">
+            <span class="text-yellow-400 text-xl" *ngFor="let star of [1,2,3,4,5]">⭐</span>
+          </div>
+          <div class="text-white/80">4.9/5 Customer Rating</div>
+        </div>
+        
+        <div class="text-center">
+          <div class="text-2xl font-bold text-white mb-2">Free</div>
+          <div class="text-white/80">First Month Trial</div>
+        </div>
+        
+        <div class="text-center">
+          <div class="text-2xl font-bold text-white mb-2">2min</div>
+          <div class="text-white/80">Quick Setup</div>
+        </div>
+      </div>
+
+      <!-- Additional assurance -->
+      <div class="mt-12 text-white/60">
+        <p>No setup fees • Cancel anytime • 24/7 support included</p>
+      </div>
+    </div>
+  </div>
+</section>

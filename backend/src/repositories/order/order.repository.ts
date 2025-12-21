@@ -24,6 +24,11 @@ export class OrderRepository extends BaseRepository<Order> implements IOrderRepo
         .collection('orders')
         .where('placeId', '==', placeId);
 
+      // Add branchId filter if provided
+      if (query?.branchId) {
+        ordersQuery = ordersQuery.where('branchId', '==', query.branchId);
+      }
+
       if (query?.status) {
         ordersQuery = ordersQuery.where('status', '==', query.status);
       }
@@ -52,9 +57,26 @@ export class OrderRepository extends BaseRepository<Order> implements IOrderRepo
       ordersQuery = ordersQuery.orderBy('createdAt', 'desc');
 
       const snapshot = await ordersQuery.get();
-      return this.mapDocumentsToEntities(snapshot.docs);
+      let orders = this.mapDocumentsToEntities(snapshot.docs);
+
+      // Filter by orderNumber in memory if provided (to avoid Firestore index issues)
+      if (query?.orderNumber) {
+        orders = orders.filter(order => 
+          order.orderNumber.toLowerCase().includes(query.orderNumber!.toLowerCase())
+        );
+      }
+
+      return orders;
     } catch (error) {
       console.error('Error getting orders by place ID:', error);
+      // Check for Firestore index error
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'failed-precondition') {
+        console.error('Missing Firestore composite index! Check Firebase Console for index creation link.');
+        console.error('Required index: orders collection, fields: placeId (Ascending), createdAt (Descending)');
+        if ('message' in error && typeof error.message === 'string' && error.message.includes('index')) {
+          console.error('Index error details:', error.message);
+        }
+      }
       throw new Error('Failed to retrieve orders');
     }
   }
@@ -112,20 +134,43 @@ export class OrderRepository extends BaseRepository<Order> implements IOrderRepo
   }
 
   // Real-time operations for cashier
-  subscribeToOrdersByPlaceId(placeId: string, callback: (orders: Order[]) => void): () => void {
-    const unsubscribe = this.firestore
+  subscribeToOrdersByPlaceId(
+    placeId: string, 
+    callback: (orders: Order[]) => void,
+    options?: { branchId?: string; hoursBack?: number }
+  ): () => void {
+    // Calculate time filter (default to 6 hours)
+    const hoursBack = options?.hoursBack ?? 6;
+    const timeThreshold = new Date();
+    timeThreshold.setHours(timeThreshold.getHours() - hoursBack);
+
+    // Build query
+    let query = this.firestore
       .collection('orders')
       .where('placeId', '==', placeId)
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(
-        (snapshot: QuerySnapshot) => {
-          const orders = this.mapDocumentsToEntities(snapshot.docs);
-          callback(orders);
-        },
-        (error) => {
-          console.error('Error in orders subscription:', error);
+      .where('createdAt', '>=', timeThreshold);
+
+    // Add branchId filter if provided
+    if (options?.branchId) {
+      query = query.where('branchId', '==', options.branchId);
+    }
+
+    // Order by creation date (newest first)
+    query = query.orderBy('createdAt', 'desc');
+
+    const unsubscribe = query.onSnapshot(
+      (snapshot: QuerySnapshot) => {
+        const orders = this.mapDocumentsToEntities(snapshot.docs);
+        callback(orders);
+      },
+      (error) => {
+        console.error('Error in orders subscription:', error);
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'failed-precondition') {
+          console.error('Missing composite index! Check Firebase Console for index creation link.');
         }
-      );
+        callback([]);
+      }
+    );
 
     return unsubscribe;
   }
@@ -151,21 +196,45 @@ export class OrderRepository extends BaseRepository<Order> implements IOrderRepo
     return unsubscribe;
   }
 
-  subscribeToOrdersByStatus(placeId: string, statuses: Order['status'][], callback: (orders: Order[]) => void): () => void {
-    const unsubscribe = this.firestore
+  subscribeToOrdersByStatus(
+    placeId: string, 
+    statuses: Order['status'][], 
+    callback: (orders: Order[]) => void,
+    options?: { branchId?: string; hoursBack?: number }
+  ): () => void {
+    // Calculate time filter (default to 6 hours)
+    const hoursBack = options?.hoursBack ?? 6;
+    const timeThreshold = new Date();
+    timeThreshold.setHours(timeThreshold.getHours() - hoursBack);
+
+    // Build query
+    let query = this.firestore
       .collection('orders')
       .where('placeId', '==', placeId)
       .where('status', 'in', statuses)
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(
-        (snapshot: QuerySnapshot) => {
-          const orders = this.mapDocumentsToEntities(snapshot.docs);
-          callback(orders);
-        },
-        (error) => {
-          console.error('Error in orders by status subscription:', error);
+      .where('createdAt', '>=', timeThreshold);
+
+    // Add branchId filter if provided
+    if (options?.branchId) {
+      query = query.where('branchId', '==', options.branchId);
+    }
+
+    // Order by creation date (newest first)
+    query = query.orderBy('createdAt', 'desc');
+
+    const unsubscribe = query.onSnapshot(
+      (snapshot: QuerySnapshot) => {
+        const orders = this.mapDocumentsToEntities(snapshot.docs);
+        callback(orders);
+      },
+      (error) => {
+        console.error('Error in orders by status subscription:', error);
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'failed-precondition') {
+          console.error('Missing composite index! Check Firebase Console for index creation link.');
         }
-      );
+        callback([]);
+      }
+    );
 
     return unsubscribe;
   }
@@ -251,21 +320,59 @@ export class OrderRepository extends BaseRepository<Order> implements IOrderRepo
       const dateString = today.toISOString().split('T')[0]?.replace(/-/g, '');
       
       // Get today's order count
+      // Use start and end of day timestamps for filtering
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      endOfDay.setHours(23, 59, 59, 999);
       
+      // Query by placeId only (no composite index needed), then filter in memory
+      // This avoids the need for a composite index on (placeId, createdAt)
       const snapshot = await this.firestore
         .collection('orders')
         .where('placeId', '==', placeId)
-        .where('createdAt', '>=', startOfDay)
-        .where('createdAt', '<', endOfDay)
         .get();
 
-      const orderCount = snapshot.size + 1;
+      // Filter orders created today in memory
+      const todayOrders = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        if (!data.createdAt) {
+          return false; // Skip orders without createdAt
+        }
+        
+        let createdAt: Date;
+        if (data.createdAt?.toDate) {
+          // Firestore Timestamp
+          createdAt = data.createdAt.toDate();
+        } else if (data.createdAt instanceof Date) {
+          createdAt = data.createdAt;
+        } else if (typeof data.createdAt === 'string' || typeof data.createdAt === 'number') {
+          createdAt = new Date(data.createdAt);
+        } else {
+          return false; // Skip orders with invalid createdAt
+        }
+        
+        // Check if date is valid
+        if (isNaN(createdAt.getTime())) {
+          return false;
+        }
+        
+        return createdAt >= startOfDay && createdAt <= endOfDay;
+      });
+
+      const orderCount = todayOrders.length + 1;
       return `ORD-${dateString}-${orderCount.toString().padStart(3, '0')}`;
     } catch (error) {
       console.error('Error generating order number:', error);
-      throw new Error('Failed to generate order number');
+      // Log the full error details for debugging
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      throw new Error(`Failed to generate order number: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

@@ -173,7 +173,8 @@ export class AuthService implements IAuthService {
         },
         rawClaims: this.sanitizeClaims(decodedToken)
       },
-      ...(this.extractPlaces(command) ? { places: this.extractPlaces(command) } : existingUser?.places ? { places: existingUser.places } : {})
+      placeId: this.extractPlaceId(command) ?? existingUser?.placeId ?? null,
+      branchId: this.extractBranchId(command) ?? existingUser?.branchId ?? null
     };
 
     const sanitizedPayload = this.removeUndefinedValues(persistencePayload);
@@ -294,15 +295,16 @@ export class AuthService implements IAuthService {
     };
   }
 
-  private extractPlaces(command?: LoginCommand | SignupCommand): string[] | undefined {
+  private extractPlaceId(command?: LoginCommand | SignupCommand): string | null | undefined {
     if (!command) return undefined;
     const signupCommand = command as SignupCommand;
-    if (!signupCommand.places) {
-      return undefined;
-    }
-    return Array.isArray(signupCommand.places)
-      ? signupCommand.places.filter((placeId): placeId is string => typeof placeId === 'string' && placeId.trim().length > 0)
-      : undefined;
+    return signupCommand.placeId;
+  }
+
+  private extractBranchId(command?: LoginCommand | SignupCommand): string | null | undefined {
+    if (!command) return undefined;
+    const signupCommand = command as SignupCommand;
+    return signupCommand.branchId;
   }
 
   private extractPreferences(command?: LoginCommand | SignupCommand): Record<string, unknown> | undefined {

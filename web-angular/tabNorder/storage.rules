@@ -1,0 +1,25 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Images and assets
+    match /images/{allPaths=**} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && 
+        get(/databases/(default)/documents/userRoles/$(request.auth.uid)).data.role in ['admin'];
+    }
+    
+    // User uploads
+    match /uploads/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && 
+        get(/databases/(default)/documents/userRoles/$(request.auth.uid)).data.role in ['admin', 'cashier'];
+    }
+    
+    // Restaurant assets
+    match /restaurant/{allPaths=**} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && 
+        get(/databases/(default)/documents/userRoles/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}

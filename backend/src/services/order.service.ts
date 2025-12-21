@@ -2,6 +2,12 @@ import { Order, CreateOrderCommand, UpdateOrderCommand, OrderQuery, OrderItem } 
 import { IOrderRepository } from '../repositories/interfaces/order.repository.interface';
 import { OrderRepository } from '../repositories/order/order.repository';
 import { IOrderService } from './interfaces/order.service.interface';
+import { AuthorizationService, IAuthorizationService, IUserContext } from './authorization.service';
+import { IItemService } from './item.service';
+import { ItemService } from './item.service';
+import { ItemCostCalculatorService } from './item-cost-calculator.service';
+import { IInventoryService } from './interfaces/inventory.service.interface';
+import { InventoryService } from './inventory.service';
 
 /**
  * Order Service - Contains ALL business logic and validation
@@ -11,14 +17,35 @@ import { IOrderService } from './interfaces/order.service.interface';
  */
 export class OrderService implements IOrderService {
   private readonly orderRepository: IOrderRepository;
+  private readonly authorizationService: IAuthorizationService;
+  private readonly itemService: IItemService;
+  private readonly inventoryService: IInventoryService;
+  private readonly costCalculator: ItemCostCalculatorService;
 
-  constructor(orderRepository?: IOrderRepository) {
+  constructor(
+    orderRepository?: IOrderRepository, 
+    authorizationService?: IAuthorizationService,
+    itemService?: IItemService,
+    inventoryService?: IInventoryService
+  ) {
     this.orderRepository = orderRepository ?? new OrderRepository();
+    this.authorizationService = authorizationService ?? new AuthorizationService();
+    this.itemService = itemService ?? new ItemService();
+    this.inventoryService = inventoryService ?? new InventoryService();
+    this.costCalculator = new ItemCostCalculatorService(this.inventoryService);
   }
 
-  async createOrder(command: CreateOrderCommand): Promise<Order> {
+  async createOrder(command: CreateOrderCommand, userContext?: IUserContext): Promise<Order> {
     // Business validation
     this.validateCreateOrderCommand(command);
+
+    // Authorization: ensure user can access this place
+    if (userContext) {
+      this.authorizationService.assertCanAccessPlace(userContext, command.placeId);
+    }
+
+    // Validate inventory availability for all items
+    await this.validateInventoryForOrder(command.items, command.placeId);
 
     // Generate order number
     const orderNumber = await this.orderRepository.generateOrderNumber(command.placeId);
@@ -44,6 +71,8 @@ export class OrderService implements IOrderService {
       items: orderItems,
       status: 'pending',
       type: command.type,
+      tableId: command.tableId,
+      notes: command.notes,
       subtotal: totals.subtotal,
       tax: totals.tax,
       serviceFee: totals.serviceFee,
@@ -58,6 +87,9 @@ export class OrderService implements IOrderService {
 
     // Create order in repository
     const orderId = await this.orderRepository.create(order);
+
+    // Reduce inventory for all items in the order
+    await this.reduceInventoryForOrder(command.items, command.placeId);
 
     // Return the created order
     const createdOrder = await this.orderRepository.getById(orderId);
@@ -105,25 +137,41 @@ export class OrderService implements IOrderService {
     return await this.orderRepository.getById(id);
   }
 
-  async getOrdersByPlaceId(placeId: string, query?: OrderQuery): Promise<Order[]> {
+  async getOrdersByPlaceId(placeId: string, query?: OrderQuery, userContext?: IUserContext): Promise<Order[]> {
+    if (userContext) {
+      // For admins, enforce their place; for super admins, allow requested place
+      this.authorizationService.assertCanAccessPlace(userContext, placeId);
+    }
     return await this.orderRepository.getOrdersByPlaceId(placeId, query);
   }
 
-  async getOrderByOrderNumber(placeId: string, orderNumber: string): Promise<Order | null> {
+  async getOrderByOrderNumber(placeId: string, orderNumber: string, userContext?: IUserContext): Promise<Order | null> {
+    if (userContext) {
+      this.authorizationService.assertCanAccessPlace(userContext, placeId);
+    }
     return await this.orderRepository.getOrderByOrderNumber(placeId, orderNumber);
   }
 
   // Real-time operations for cashier
-  subscribeToOrdersByPlaceId(placeId: string, callback: (orders: Order[]) => void): () => void {
-    return this.orderRepository.subscribeToOrdersByPlaceId(placeId, callback);
+  subscribeToOrdersByPlaceId(
+    placeId: string, 
+    callback: (orders: Order[]) => void,
+    options?: { branchId?: string; hoursBack?: number }
+  ): () => void {
+    return this.orderRepository.subscribeToOrdersByPlaceId(placeId, callback, options);
   }
 
   subscribeToOrderUpdates(orderId: string, callback: (order: Order | null) => void): () => void {
     return this.orderRepository.subscribeToOrderUpdates(orderId, callback);
   }
 
-  subscribeToOrdersByStatus(placeId: string, statuses: Order['status'][], callback: (orders: Order[]) => void): () => void {
-    return this.orderRepository.subscribeToOrdersByStatus(placeId, statuses, callback);
+  subscribeToOrdersByStatus(
+    placeId: string, 
+    statuses: Order['status'][], 
+    callback: (orders: Order[]) => void,
+    options?: { branchId?: string; hoursBack?: number }
+  ): () => void {
+    return this.orderRepository.subscribeToOrdersByStatus(placeId, statuses, callback, options);
   }
 
   async updateOrderStatus(orderId: string, status: Order['status'], updatedBy: string): Promise<void> {
@@ -229,6 +277,86 @@ export class OrderService implements IOrderService {
       discount: discount > 0 ? discount : undefined,
       total
     };
+  }
+
+  /**
+   * Validate inventory availability for order items
+   */
+  private async validateInventoryForOrder(
+    items: CreateOrderCommand['items'],
+    placeId: string
+  ): Promise<void> {
+    for (const orderItem of items) {
+      // Get the item to access its recipe
+      const item = await this.itemService.getItemById(orderItem.itemId);
+      if (!item) {
+        throw new Error(`Item not found: ${orderItem.itemId}`);
+      }
+
+      // If item has a recipe, validate inventory
+      if (item.recipe && item.recipe.length > 0) {
+        const validation = await this.costCalculator.validateInventoryForQuantity(
+          item.recipe,
+          orderItem.quantity,
+          placeId,
+          item.branchId
+        );
+
+        if (!validation.valid) {
+          const missingList = validation.missingIngredients?.map(
+            m => `${m.ingredientName} (available: ${m.available}, required: ${m.required})`
+          ).join(', ') || 'unknown ingredients';
+          throw new Error(
+            `Insufficient inventory for item "${item.name}". Missing: ${missingList}`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Reduce inventory for all items in an order
+   */
+  private async reduceInventoryForOrder(
+    items: CreateOrderCommand['items'],
+    placeId: string
+  ): Promise<void> {
+    for (const orderItem of items) {
+      // Get the item to access its recipe
+      const item = await this.itemService.getItemById(orderItem.itemId);
+      if (!item || !item.recipe || item.recipe.length === 0) {
+        continue; // Skip items without recipes
+      }
+
+      // Calculate inventory reductions
+      const reductions = await this.costCalculator.calculateInventoryReduction(
+        item.recipe,
+        orderItem.quantity,
+        placeId,
+        item.branchId
+      );
+
+      // Apply reductions
+      for (const reduction of reductions) {
+        try {
+          await this.inventoryService.reduceInventory(
+            reduction.inventoryId,
+            reduction.quantity,
+            `Order for item: ${item.name}`
+          );
+        } catch (error) {
+          console.error(`Failed to reduce inventory ${reduction.inventoryId}:`, error);
+          // Continue with other reductions even if one fails
+        }
+      }
+
+      // Recalculate the item's available units
+      try {
+        await this.itemService.recalculateItem(item.id);
+      } catch (error) {
+        console.error(`Failed to recalculate item ${item.id}:`, error);
+      }
+    }
   }
 
   private generateId(): string {

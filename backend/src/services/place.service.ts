@@ -32,23 +32,36 @@ export class PlaceService implements IPlaceService {
     }
 
     // Create new place with business rules applied
+    // Only include optional settings fields if they are defined (not undefined)
+    const settings: Place['settings'] = {
+      currency: command.settings.currency,
+      timezone: command.settings.timezone,
+      language: command.settings.language,
+      allowOnlineOrders: command.settings.allowOnlineOrders ?? true,
+      requireOrderConfirmation: command.settings.requireOrderConfirmation ?? false
+    };
+
+    // Only add optional fields if they are defined
+    if (command.settings.minimumOrderAmount !== undefined) {
+      settings.minimumOrderAmount = command.settings.minimumOrderAmount;
+    }
+    if (command.settings.deliveryFee !== undefined) {
+      settings.deliveryFee = command.settings.deliveryFee;
+    }
+    if (command.settings.serviceFee !== undefined) {
+      settings.serviceFee = command.settings.serviceFee;
+    }
+    if (command.settings.taxRate !== undefined) {
+      settings.taxRate = command.settings.taxRate;
+    }
+
     const placeData: Omit<Place, 'id' | 'createdAt' | 'updatedAt'> = {
       name: command.name,
       description: command.description,
       address: command.address,
       contact: command.contact,
       businessHours: command.businessHours,
-      settings: {
-        currency: command.settings.currency,
-        timezone: command.settings.timezone,
-        language: command.settings.language,
-        allowOnlineOrders: command.settings.allowOnlineOrders ?? true,
-        requireOrderConfirmation: command.settings.requireOrderConfirmation ?? false,
-        minimumOrderAmount: command.settings.minimumOrderAmount,
-        deliveryFee: command.settings.deliveryFee,
-        serviceFee: command.settings.serviceFee,
-        taxRate: command.settings.taxRate
-      },
+      settings,
       status: 'pending_approval', // New places require approval
       ownerId: command.ownerId
     };
@@ -109,7 +122,39 @@ export class PlaceService implements IPlaceService {
     }
 
     if (command.settings !== undefined) {
-      updateData.settings = { ...existingPlace.settings, ...command.settings } as Place['settings'];
+      // Merge settings, but only include defined values (filter out undefined)
+      const mergedSettings: Place['settings'] = { ...existingPlace.settings };
+      
+      // Only update fields that are explicitly provided (not undefined)
+      if (command.settings.currency !== undefined) {
+        mergedSettings.currency = command.settings.currency;
+      }
+      if (command.settings.timezone !== undefined) {
+        mergedSettings.timezone = command.settings.timezone;
+      }
+      if (command.settings.language !== undefined) {
+        mergedSettings.language = command.settings.language;
+      }
+      if (command.settings.allowOnlineOrders !== undefined) {
+        mergedSettings.allowOnlineOrders = command.settings.allowOnlineOrders;
+      }
+      if (command.settings.requireOrderConfirmation !== undefined) {
+        mergedSettings.requireOrderConfirmation = command.settings.requireOrderConfirmation;
+      }
+      if (command.settings.minimumOrderAmount !== undefined) {
+        mergedSettings.minimumOrderAmount = command.settings.minimumOrderAmount;
+      }
+      if (command.settings.deliveryFee !== undefined) {
+        mergedSettings.deliveryFee = command.settings.deliveryFee;
+      }
+      if (command.settings.serviceFee !== undefined) {
+        mergedSettings.serviceFee = command.settings.serviceFee;
+      }
+      if (command.settings.taxRate !== undefined) {
+        mergedSettings.taxRate = command.settings.taxRate;
+      }
+      
+      updateData.settings = mergedSettings;
     }
 
     if (command.status !== undefined) {

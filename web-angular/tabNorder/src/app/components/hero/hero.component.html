@@ -1,0 +1,227 @@
+<section class="min-h-screen flex flex-col bg-hero-darker relative overflow-hidden pt-20 sm:pt-24">
+  <!-- Multiple layered light bloom effects -->
+  <div class="absolute inset-0 bg-gradient-bloom"></div>
+  <!-- Narrow light bloom behind interface mockup - expands to top -->
+  <div class="bloom absolute bottom-0 left-1/2 -translate-x-1/2 w-[40px] h-[80%] bg-gradient-to-t from-primary/40 via-secondary/20 to-transparent rounded-full blur-2xl animate-pulse-slow"></div>
+  <div class="bloom absolute bottom-0 left-1/2 -translate-x-1/2 w-[300px] h-[90%] bg-gradient-to-t from-white/30 via-primary/15 to-transparent rounded-full blur-xl animate-pulse-slow" style="animation-delay: 0.5s;"></div>
+  
+  <!-- Main central light bloom -->
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -translate-y-1 w-[60px] h-[60px] md:w-[800px] md:h-[600px] bg-gradient-radial from-primary/30 via-secondary/15 to-transparent rounded-full blur-3xl"></div>
+  
+  <!-- Secondary smaller bloom -->
+  <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 -translate-y-1 w-[50px] h-[50px] md:w-[400px] md:h-[300px] bg-gradient-radial from-secondary/25 via-primary/10 to-transparent rounded-full blur-2xl"></div>
+  
+  <!-- Subtle edge vignette -->
+  <div class="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-hero-darker/60"></div>
+
+  <!-- Background decorative elements - very subtle -->
+  <div class="absolute inset-0 opacity-3">
+    <div class="absolute top-20 left-20 w-32 h-32 bg-red-500/5 rounded-full animate-float blur-sm"></div>
+    <div class="absolute bottom-40 right-20 w-24 h-24 bg-red-500/5 rounded-full animate-float blur-sm" style="animation-delay: 1s;"></div>
+    <div class="absolute top-1/3 left-10 w-16 h-16 bg-red-500/5 rounded-full animate-float blur-sm" style="animation-delay: 2s;"></div>
+    <div class="absolute top-1/4 right-1/4 w-20 h-20 bg-red-500/5 rounded-full animate-float blur-sm" style="animation-delay: 0.5s;"></div>
+  </div>
+
+  <!-- Central explosion light bloom -->
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-white/40 via-primary/30 to-transparent rounded-full blur-3xl animate-pulse-glow"></div>
+  
+  <!-- Exploding food elements from center -->
+  <div class="absolute inset-0 pointer-events-none z-10">
+    <!-- Pizza emoji - explodes to top-left -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-tl" style="animation-delay: 0.2s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-20 h-20 bg-primary/30 rounded-full blur-2xl -translate-x-2 -translate-y-2"></div>
+        <div class="relative w-16 h-16 text-4xl drop-shadow-2xl">🍕</div>
+      </div>
+    </div>
+    
+    <!-- Burger emoji - explodes to top-right -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-tr" style="animation-delay: 0.4s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-24 h-24 bg-secondary/30 rounded-full blur-2xl -translate-x-2 -translate-y-2"></div>
+        <div class="relative w-20 h-20 text-5xl drop-shadow-2xl">🍔</div>
+      </div>
+    </div>
+    
+    <!-- Coffee emoji - explodes to bottom-right -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-br" style="animation-delay: 0.6s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-18 h-18 bg-orange-400/30 rounded-full blur-2xl -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-14 h-14 text-3xl drop-shadow-2xl">☕</div>
+      </div>
+    </div>
+
+    <!-- Sushi emoji - explodes to bottom-left -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-bl" style="animation-delay: 0.8s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-16 h-16 bg-green-400/30 rounded-full blur-xl -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-12 h-12 text-2xl drop-shadow-xl">🍣</div>
+      </div>
+    </div>
+
+    <!-- Ice cream emoji - explodes to top-center -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-tc" style="animation-delay: 1s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-14 h-14 bg-pink-400/30 rounded-full blur-lg -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-10 h-10 text-2xl drop-shadow-lg">🍦</div>
+      </div>
+    </div>
+
+    <!-- Taco emoji - explodes to left-center -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-lc" style="animation-delay: 1.2s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-12 h-12 bg-yellow-400/30 rounded-full blur-lg -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-8 h-8 text-xl drop-shadow-lg">🌮</div>
+      </div>
+    </div>
+
+    <!-- Donut emoji - explodes to right-center -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-rc" style="animation-delay: 1.4s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-16 h-16 bg-purple-400/30 rounded-full blur-xl -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-12 h-12 text-2xl drop-shadow-xl">🍩</div>
+      </div>
+    </div>
+
+    <!-- Salad emoji - explodes to bottom-center -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-bc" style="animation-delay: 1.6s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-14 h-14 bg-green-500/30 rounded-full blur-lg -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-10 h-10 text-2xl drop-shadow-lg">🥗</div>
+      </div>
+    </div>
+
+    <!-- Cake emoji - explodes to top-left corner -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-tl-corner" style="animation-delay: 1.8s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-18 h-18 bg-pink-300/30 rounded-full blur-xl -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-14 h-14 text-3xl drop-shadow-xl">🎂</div>
+      </div>
+    </div>
+
+    <!-- Hot dog emoji - explodes to top-right corner -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-tr-corner" style="animation-delay: 2s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-12 h-12 bg-orange-500/30 rounded-full blur-lg -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-8 h-8 text-xl drop-shadow-lg">🌭</div>
+      </div>
+    </div>
+
+    <!-- French fries emoji - explodes to bottom-left corner -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-bl-corner" style="animation-delay: 2.2s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-14 h-14 bg-yellow-500/30 rounded-full blur-lg -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-10 h-10 text-2xl drop-shadow-lg">🍟</div>
+      </div>
+    </div>
+
+    <!-- Coffee cup emoji - explodes to bottom-right corner -->
+    <div class="absolute opacity-0 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-explode-br-corner" style="animation-delay: 2.4s;">
+      <div class="relative">
+        <div class="absolute inset-0 w-14 h-14 bg-orange-500/30 rounded-full blur-lg -translate-x-1 -translate-y-1"></div>
+        <div class="relative w-10 h-10 text-2xl drop-shadow-lg">☕</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="container mx-auto px-4 sm:px-6 py-12 sm:py-20 flex-1 flex items-center relative z-20">
+    <div class="max-w-4xl mx-auto text-center">
+      <div class="animate-slide-up">
+        <div class="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-3 sm:px-4 py-2 text-white/95 text-xs sm:text-sm mb-4 sm:mb-6 border border-white/10">
+          <span class="w-3 h-3 sm:w-4 sm:h-4">📱</span>
+          <span class="hidden sm:inline">Smart QR Ordering System</span>
+          <span class="sm:hidden">QR Ordering</span>
+        </div>
+        
+        <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+          Build and ship restaurant<br class="hidden sm:block" />
+          <span class="bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">ordering on a single platform</span>
+        </h1>
+        
+        <p class="text-base sm:text-lg md:text-xl text-white/85 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4">
+          Join the world's most widely adopted QR-powered restaurant platform. Transform dining experiences with instant ordering.
+        </p>
+        
+        <div class="flex flex-col sm:flex-row gap-4 justify-center mb-8 sm:mb-12 px-4">
+          <div class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+            <input 
+              type="email" 
+              [(ngModel)]="email"
+              placeholder="Enter your email" 
+              class="h-10 sm:h-12 px-4 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-white/20 w-full sm:min-w-80 transition-all duration-300 text-sm sm:text-base"
+            />
+            <button class="bg-green-600 hover:bg-green-700 text-white border-0 shadow-glow w-full sm:w-auto text-sm sm:text-base px-6 py-3 rounded-lg font-medium transition-colors" (click)="onSignUp()">
+              <span class="hidden sm:inline">Sign up for Tap n Order</span>
+              <span class="sm:hidden">Sign up</span>
+            </button>
+          </div>
+          <button class="bg-white/15 border border-white/30 text-white hover:bg-white hover:text-primary backdrop-blur-md w-full sm:w-auto text-sm sm:text-base px-6 py-3 rounded-lg font-medium transition-colors" (click)="onTryDemo()">
+            <span class="hidden sm:inline">Try Tap n Order Demo</span>
+            <span class="sm:hidden">Try Demo</span>
+          </button>
+          <button class="bg-white/15 border border-white/30 text-white hover:bg-white hover:text-primary backdrop-blur-md w-full sm:w-auto text-sm sm:text-base px-6 py-3 rounded-lg font-medium transition-colors" (click)="onViewMenu()">
+            <span class="hidden sm:inline">View Menu</span>
+            <span class="sm:hidden">Menu</span>
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-white/85 text-xs sm:text-sm px-4">
+          <div class="flex items-center gap-2">
+            <div class="flex">
+              <span class="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 drop-shadow-lg" *ngFor="let star of [1,2,3,4,5]">⭐</span>
+            </div>
+            <span class="hidden sm:inline">Trusted by 1000+ restaurants</span>
+            <span class="sm:hidden">1000+ restaurants</span>
+          </div>
+          <div class="hidden sm:block">•</div>
+          <div class="text-center sm:text-left">Free setup in 2 minutes</div>
+          <div class="hidden sm:block">•</div>
+          <div class="text-center sm:text-left">24/7 support included</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu interface mockup at bottom -->
+  <div class="relative z-20 px-4 sm:px-6 pb-4 sm:pb-8">
+    <div class="container mx-auto">
+      <div class="relative max-w-5xl mx-auto">
+        <!-- Enhanced glow effect -->
+        <div class="absolute -inset-4 sm:-inset-8 bg-gradient-to-r from-primary/30 via-secondary/25 to-primary/30 rounded-3xl blur-2xl sm:blur-3xl animate-pulse-slow"></div>
+        <div class="absolute -inset-2 sm:-inset-4 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-3xl blur-lg sm:blur-xl animate-pulse-slow"></div>
+        
+        <!-- Glass Menu Interface -->
+        <div class="relative">
+          <!-- Glass screen effect -->
+          <div class="relative bg-white/5 backdrop-blur-xl rounded-3xl sm:rounded-4xl p-6 sm:p-8 border border-white/30 shadow-2xl overflow-hidden">
+            <!-- Glass reflections -->
+            <div class="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/5 rounded-3xl sm:rounded-4xl"></div>
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+            <div class="absolute top-4 left-4 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+            <div class="absolute bottom-8 right-8 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
+            
+            <!-- Screen content -->
+            <div class="relative z-10 h-[600px] sm:h-[700px] overflow-hidden rounded-2xl bg-white/10 flex items-center justify-center">
+              <div class="text-white/50 text-center">
+                <div class="text-6xl mb-4">📱</div>
+                <p class="text-lg">Demo Interface</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Floating labels with enhanced visibility -->
+        <div class="absolute -top-2 sm:-top-4 left-4 sm:left-8 bg-white/95 backdrop-blur-sm rounded-full px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium text-primary shadow-glow animate-float border border-white/20">
+          <span class="hidden sm:inline">QR Code Menu</span>
+          <span class="sm:hidden">QR Menu</span>
+        </div>
+        <div class="absolute -bottom-2 sm:-bottom-4 right-4 sm:right-8 bg-gradient-primary rounded-full px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium text-white shadow-glow animate-float border border-primary/20" style="animation-delay: 1s;">
+          <span class="hidden sm:inline">Instant Ordering</span>
+          <span class="sm:hidden">Order Now</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

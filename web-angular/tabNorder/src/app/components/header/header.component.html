@@ -1,0 +1,48 @@
+<header class="fixed top-0 left-0 right-0 z-50">
+  <div class="container mx-auto px-4 sm:px-6 py-4">
+    <div class="flex items-center justify-between">
+      <!-- Logo and Restaurant Name -->
+      <div class="flex items-center gap-3">
+        <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden">
+          <img 
+            [src]="settings?.logo || logoImage" 
+            [alt]="settings?.name || 'Tap n Order'"
+            class="w-full h-full object-cover"
+          />
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-lg md:text-xl font-bold text-white opacity-70">
+            Tap n Order
+          </h1>
+          <p class="text-xs text-white/70">
+            new way to live
+          </p>
+        </div>
+      </div>
+
+      <!-- Color Pickers -->
+      <div class="flex items-center gap-2">
+        <input
+          type="color"
+          [value]="primaryColor"
+          (input)="onThemeColorChange($any($event.target).value)"
+          class="w-8 h-8 rounded-lg border-white/30"
+          [style.background-color]="primaryColor"
+        />
+        <input
+          type="color"
+          [value]="secondaryColor"
+          (input)="onSecondaryColorChange($any($event.target).value)"
+          class="w-8 h-8 rounded-lg border-white/30"
+          [style.background-color]="secondaryColor"
+        />
+        <button
+          (click)="onResetColors()"
+          class="w-8 h-8 p-0 text-white/70 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+        >
+          ↻
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
